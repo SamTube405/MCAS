@@ -54,5 +54,7 @@ ml_output
 - INFORMATION_IDS: path to information IDs
 - MODEL_PARAMS: dictionary of ML model keys and parameters values. Note if parameter includes a list of tuples, it must be converted to list of lists
 
-Availble ML models: ['RandomForestRegressor','ExtraTreesRegressor','BaggingRegressor', 'GradientBoostingRegressor', 'AdaBoostRegressor', 'GaussianProcessRegressor', 'IsotonicRegression', 'ARDRegression', 'HuberRegressor', 'LinearRegression', 'LogisticRegression', 'LogisticRegressionCV', 'PassiveAggressiveRegressor', 'SGDRegressor', 'TheilSenRegressor', 'RANSACRegressor', 'KNeighborsRegressor', 'RadiusNeighborsRegressor', 'MLPRegressor', 'DecisionTreeRegressor', 'ExtraTreeRegressor']
+Available ML models: ['RandomForestRegressor','ExtraTreesRegressor','BaggingRegressor', 'GradientBoostingRegressor', 'AdaBoostRegressor', 'GaussianProcessRegressor', 'IsotonicRegression', 'ARDRegression', 'HuberRegressor', 'LinearRegression', 'LogisticRegression', 'LogisticRegressionCV', 'PassiveAggressiveRegressor', 'SGDRegressor', 'TheilSenRegressor', 'RANSACRegressor', 'KNeighborsRegressor', 'RadiusNeighborsRegressor', 'MLPRegressor', 'DecisionTreeRegressor', 'ExtraTreeRegressor']
+
+The script can test different models at once if multiple models are defined in the config files along with their corresponding parameters for optimization.
  
