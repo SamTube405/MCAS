@@ -3,7 +3,7 @@ Multiplatform Cascade Simulator
 
 # Prediction Module
 
-source activate pnnl_socialsim
+source activate pnnl_socialsim<br>
 python run_predictions.py --config ./metadata/configs/seed_predictions.json
 
 ## Directory Hierarchy:
