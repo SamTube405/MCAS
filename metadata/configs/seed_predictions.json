@@ -1,0 +1,33 @@
+{
+"VERSION_TAG":"v1_prev_day",
+"DOMAIN":"cpec",
+"PLATFORM":"twitter",
+"PREDICTION_TYPE":"seed",
+"start_train_period":"2020-03-30",
+"end_train_period":"2020-06-15",
+"start_sim_period":"2020-06-16",
+"end_sim_period":"2020-06-29",
+"time_lag":
+    {
+    "days":1,
+    "hours":0
+    },
+"FEATURES_PATH":
+    {
+    "GLOBAL":"./ml_input/{0}/{1}/global/",
+    "LOCAL":"./ml_input/{0}/{1}/local/",
+    "TARGET":"./ml_input/{0}/{1}/target/{2}/"
+    },
+"INFORMATION_IDS":"./ml_input/{0}/{0}_infoids.txt",
+"MODEL_PARAMS":
+    {
+    "MLPRegressor":
+        {
+        "hidden_layer_sizes":[[32,64,16],[30,10,5], [15,10,5], [10]],
+        "activation": ["relu", "logistic"],
+        "solver": ["sgd", "adam"],
+        "alpha": [0.01, 0.001, 0.0001],
+        "learning_rate": ["constant","adaptive", "invscaling"]                                                      
+        }  
+    }
+}
