@@ -67,7 +67,10 @@ def getFeatureTargetDay(x,xnarrative,target,features_local=[], features_global=[
     
     '''
     ### target variable
-    target_variable=target.loc[x][xnarrative]
+    try:
+        target_variable=target.loc[x][xnarrative]
+    except:
+        target_variable=0
     
     ### create one-hot encoding vector
     Tindex=narrative_list.index(xnarrative)
@@ -112,7 +115,10 @@ def getFeatureTargetSequence(x,xnarrative,target,features_local=[], features_glo
     
     '''
     ### target variable
-    target_variable=target.loc[x][xnarrative]
+    try:
+        target_variable=target.loc[x][xnarrative]
+    except:
+        target_variable=0
     
     ### create one-hot encoding vector
     Tindex=narrative_list.index(xnarrative)
@@ -140,6 +146,59 @@ def getFeatureTargetSequence(x,xnarrative,target,features_local=[], features_glo
         
     ### append one-hot encoding vector
     features=np.concatenate([features,narrative_binary],axis=1)
+
+    return features,target_variable
+
+def getFeatureTargetSequenceFlatten(x,xnarrative,target,features_local=[], features_global=[], delta=(1,0),narrative_list=[]):
+    '''
+    Description: Generates a sequence of previous day features and target variable at next day for a particular frame.
+    
+    Input:
+        x: timestamp
+        xnarrative: frame to be processed
+        target: target dataframe
+        features_local: list of features per frame
+        features_global: list of global features
+        delta: indicates the time lag in (days, hours)
+        narrative_list: list of frames (all frames must start with 'informationID_')
+    
+    '''
+    ### target variable
+    try:
+        target_variable=target.loc[x][xnarrative]
+    except:
+        target_variable=0
+    
+    ### create one-hot encoding vector
+    Tindex=narrative_list.index(xnarrative)
+    narrative_binary=np.zeros(len(narrative_list))
+    narrative_binary[Tindex]=1
+    
+    features=0
+    
+    ### append all local features corresponding to time-lag sequence
+    for i,df in enumerate(features_local):
+        if i == 0:
+            features=df.loc[x-timedelta(days=delta[0], hours=delta[1]):x-timedelta(days=1)][[xnarrative]].values
+        else:
+            features_=df.loc[x-timedelta(days=delta[0], hours=delta[1]):x-timedelta(days=1)][[xnarrative]].values
+            features=np.concatenate([features,features_], axis=1)
+        
+    ### append all global features corresponding to time-lag
+    for i, df in enumerate(features_global):
+        if type(features)==int and i==0:
+            features=df.loc[x-timedelta(days=delta[0], hours=delta[1]):x-timedelta(days=1)].values
+        else:
+            features_=df.loc[x-timedelta(days=delta[0], hours=delta[1]):x-timedelta(days=1)].values
+            features=np.concatenate([features,features_], axis=1)
+        
+    ### Flatten sequence features
+    n_input = features.shape[0] * features.shape[1]
+    features = features.reshape((1, n_input))
+    
+    
+    ### append one-hot encoding vector
+    features=np.append(features,narrative_binary)
 
     return features,target_variable
 
@@ -175,7 +234,7 @@ def data_split(sim_start_date, sim_end_date, target, features_local=[],
                                                               features_local=features_local, features_global=features_global,
                                                               delta=delta)
             else:
-                features,target_variable=getFeatureTargetSequence(x,Tnarrative, target, narrative_list=narrative_list,
+                features,target_variable=getFeatureTargetSequenceFlatten(x,Tnarrative, target, narrative_list=narrative_list,
                                                               features_local=features_local, features_global=features_global,
                                                               delta=delta)
 
@@ -191,7 +250,9 @@ def data_split(sim_start_date, sim_end_date, target, features_local=[],
             data_X[:,:number_features_to_scale] = np.log1p(data_X[:,:number_features_to_scale])
             data_y = np.log1p(data_y)
         else: #sequences rather than one day
-            data_X[:,:,:number_features_to_scale] = np.log1p(data_X[:,:,:number_features_to_scale])
+            #data_X[:,:,:number_features_to_scale] = np.log1p(data_X[:,:,:number_features_to_scale])
+            number_features_to_scale = (len(features_local)+len(features_global))*delta[0]
+            data_X[:,:number_features_to_scale] = np.log1p(data_X[:,:number_features_to_scale])
             data_y = np.log1p(data_y)
 
 
@@ -245,7 +306,7 @@ def run_predictions(model_id, model, window_start_date, window_end_date, target,
                                                               features_local=features_local, features_global=features_global,
                                                               delta=delta)
             else:
-                features,target_variable=getFeatureTargetSequence(x,Tnarrative, target, narrative_list=narrative_list,
+                features,target_variable=getFeatureTargetSequenceFlatten(x,Tnarrative, target, narrative_list=narrative_list,
                                                               features_local=features_local, features_global=features_global,
                                                               delta=delta)
             sim_X.append(features)
@@ -258,7 +319,9 @@ def run_predictions(model_id, model, window_start_date, window_end_date, target,
             sim_X[:,:number_features_to_scale] = np.log1p(sim_X[:,:number_features_to_scale])
 
         else: #sequences rather than one day
-            sim_X[:,:,:number_features_to_scale] = np.log1p(sim_X[:,:,:number_features_to_scale])
+            #sim_X[:,:,:number_features_to_scale] = np.log1p(sim_X[:,:,:number_features_to_scale])
+            number_features_to_scale = (len(features_local)+len(features_global))*delta[0]
+            sim_X[:,:number_features_to_scale] = np.log1p(sim_X[:,:number_features_to_scale])
 
         sim_X[np.isnan(sim_X)] = 0
         print(sim_X.shape,len(sim_y))
@@ -308,7 +371,7 @@ def run_simulations(model_id, model, window_start_date, window_end_date, target,
                                                               features_local=features_local, features_global=features_global,
                                                               delta=delta)
             else:
-                features,target_variable=getFeatureTargetSequence(x,Tnarrative, target, narrative_list=narrative_list,
+                features,target_variable=getFeatureTargetSequenceFlatten(x,Tnarrative, target, narrative_list=narrative_list,
                                                               features_local=features_local, features_global=features_global,
                                                               delta=delta)
             sim_X.append(features)
@@ -321,7 +384,9 @@ def run_simulations(model_id, model, window_start_date, window_end_date, target,
             sim_X[:,:number_features_to_scale] = np.log1p(sim_X[:,:number_features_to_scale])
 
         else: #sequences rather than one day
-            sim_X[:,:,:number_features_to_scale] = np.log1p(sim_X[:,:,:number_features_to_scale])
+            #sim_X[:,:,:number_features_to_scale] = np.log1p(sim_X[:,:,:number_features_to_scale])
+            number_features_to_scale = (len(features_local)+len(features_global))*delta[0]
+            sim_X[:,:number_features_to_scale] = np.log1p(sim_X[:,:number_features_to_scale])
 
         sim_X[np.isnan(sim_X)] = 0
         print(sim_X.shape,len(sim_y))
