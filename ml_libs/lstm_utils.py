@@ -175,6 +175,8 @@ def getSimulationSequenceLSTM(x,xnarrative,target,features_local=[], features_gl
             features=df.loc[x-timedelta(days=time_in):x-timedelta(days=1)].values
         else:
             features_=df.loc[x-timedelta(days=time_in):x-timedelta(days=1)].values
+            if features_.ndim<2:
+                features_=features_.reshape(len(features_),1)  
             features=np.concatenate([features,features_], axis=1)
 
         
