@@ -170,31 +170,11 @@ def getSimulationSequenceLSTM(x,xnarrative,target,features_local=[], features_gl
     ### append all global features corresponding to time-lag
     for i, df in enumerate(features_global):
         if type(features)==int and i==0:
-            try:
-                ### get features within time range
-                features=df.loc[x-timedelta(days=time_in):x-timedelta(days=1)][[xnarrative]].values
-            except:
-                try:
-                    ### get features if exist within range and pad with np.NaN
-                    features=df.loc[x-timedelta(days=time_in):][[xnarrative]].values
-                    pad = time_in - features.shape[0]
-                    features=np.expand_dims(np.append(features, np.array([np.NaN]*pad)), axis=1)
-                except:  
-                    ### pad with np.NaNs
-                    features=np.array([[np.NaN]]*time_in)
+            features=df.loc[x-timedelta(days=time_in):x-timedelta(days=1)].values
         else:
-            try:
-                ### get features within time range
-                features_=df.loc[x-timedelta(days=time_in):x-timedelta(days=1)][[xnarrative]].values
-            except:
-                try:
-                    ### get features if exist within range and pad with np.NaN as placeholder
-                    features_=df.loc[x-timedelta(days=time_in):][[xnarrative]].values
-                    pad = time_in - features_.shape[0]
-                    features_=np.expand_dims(np.append(features_, np.array([np.NaN]*pad)), axis=1)
-                except:    
-                    features_=np.array([[np.NaN]]*time_in) 
+            features_=df.loc[x-timedelta(days=time_in):x-timedelta(days=1)].values
             features=np.concatenate([features,features_], axis=1)
+
         
     ### append one-hot encoding vector
     features=np.concatenate([features,narrative_binary],axis=1)
