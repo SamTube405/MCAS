@@ -61,7 +61,7 @@ print(len(info_ids),info_ids)
 output_path = "./ml_output/{0}/{1}/{2}/".format(domain, platform, prediction_type)
 output_dir = "{0}_{1}_{2}_{3}-to-{4}_{5}".format(model_id, str(start_sim_period.strftime("%Y-%m-%d")), str(end_sim_period.strftime("%Y-%m-%d")), str(n_in), str(n_out), version)
 output_path_ = output_path+output_dir+'/'
-output_path_plots = "{0}/plots".format(output_path_)
+output_path_plots = "{0}plots".format(output_path_)
 reset_dir(output_path_plots)
 
 
