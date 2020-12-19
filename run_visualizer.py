@@ -89,9 +89,10 @@ for info_id in info_ids:
 
     plt.legend()
     plt.xlabel("Time (Days)",fontSize=15)
-    plt.ylabel("# Tweets",fontSize=15)
+    plt.ylabel("# %ss"%prediction_type,fontSize=15)
     plt.yscale('log',basey=10)
-    plt.title("Topic: %s"%info_id,fontSize=14,fontweight='bold')
+    info_id_=info_id.replace('informationID_','')
+    plt.title("Topic: %s"%info_id_,fontSize=14,fontweight='bold')
     
     times = [(start_sim_period+timedelta(days=i)).strftime("%m-%d") for i in range(sim_days)]
 
@@ -127,5 +128,7 @@ for mea in ['APE','RMSE','NRMSE','SMAPE']:
     plt.legend(loc='upper right')
     plt.tight_layout()
     plt.savefig('{0}/{1}_performance.pdf'.format(output_path_plots,mea))
+    
+print('\nSimulation files for {0} stored at'.format(model_id), output_path_plots)
 
 
