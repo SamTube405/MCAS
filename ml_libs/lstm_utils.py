@@ -252,6 +252,87 @@ def data_prepare_LSTM(sim_start_date, sim_end_date, target, features_local=[],
     return data_X, data_y
 
 '''
+Get Replay Baseline predictions
+'''
+def getReplayBaselinePredictions(window_start_date, window_end_date,target, narrative_list=[]):
+    sim_days = window_end_date - window_start_date
+    sim_days = sim_days.days + 1
+
+    ## Replay.
+    baseline_window_end_date=(window_start_date-timedelta(days=1)).strftime("%Y-%m-%d")
+    baseline_window_start_date=(window_start_date-timedelta(days=sim_days)).strftime("%Y-%m-%d")
+    baseline_target=target[baseline_window_start_date:baseline_window_end_date]
+    
+    narrative_baseline_data={}
+    for Tnarrative in narrative_list:
+        y_hat=baseline_target[Tnarrative].values
+        narrative_baseline_data.setdefault(Tnarrative,y_hat)
+    return narrative_baseline_data
+
+'''
+Get Replay Baseline predictions
+'''
+def getSamplingBaselinePredictions(window_start_date, window_end_date,target, narrative_list=[]):
+    sim_days = window_end_date - window_start_date
+    sim_days = sim_days.days + 1
+
+    ## Daily rate.
+    baseline_window_end_date=(window_start_date-timedelta(days=1)).strftime("%Y-%m-%d")
+    ##baseline_window_start_date=(window_start_date-timedelta(days=sim_days+1)).strftime("%Y-%m-%d")
+    baseline_target=target[:baseline_window_end_date]
+    baseline_target=baseline_target.groupby(baseline_target.index.weekday_name).mean()
+    
+    narrative_baseline_data={}
+    next_weekday_names=[]
+    for x in datespan(window_start_date,window_end_date+timedelta(days=1),delta=timedelta(days=1)):
+        next_weekday_names.append(x.strftime("%A"))
+    ##next_weekday_names=pd.DataFrame(next_weekday_names,columns=['dow'])
+        
+    for Tnarrative in narrative_list:
+        y_hat=baseline_target[Tnarrative].loc[next_weekday_names].values
+        narrative_baseline_data.setdefault(Tnarrative,y_hat)
+    return narrative_baseline_data
+
+'''
+Evaluate baseline Predictions
+'''
+def eval_predictions(model_id,gt_data, sim_data, narrative_list=[]):
+    '''
+    Description: Run predictions for LSTM models
+    
+    Input:
+    model_id: 
+    gt_data: ground truth count dict
+    sim_data: simulation count dict
+    target: target dataframe
+    narrative_list: list of info ids
+    '''
+    Gperformance_data=[]
+
+    for Tnarrative in narrative_list:
+        sim_y=gt_data[Tnarrative]
+        y_hat=sim_data[Tnarrative]
+        
+        print("Test on narrative: %s"%Tnarrative)
+        ape_value=ape(sim_y,y_hat)
+        print("APE: ",ape_value)
+
+        rmse_value=rmse(sim_y,y_hat)
+        print("RMSE: ",rmse_value)
+
+        nrmse_value=normed_rmse(sim_y,y_hat)
+        print("NRMSE: ",nrmse_value)
+
+        smape_value=smape(sim_y,y_hat)
+        print("SMAPE: ",smape_value)
+
+        Gperformance_data.append([Tnarrative,ape_value,rmse_value,nrmse_value,smape_value,model_id])
+
+    Gperformance_data=pd.DataFrame(Gperformance_data,columns=['informationID','APE','RMSE','NRMSE','SMAPE','MODEL'])
+    
+    return Gperformance_data
+
+'''
 Run LSTM Predictions
 '''
 def run_predictions_LSTM(model_id, model, window_start_date, window_end_date, target, narrative_list=[], features_local=[],
@@ -315,22 +396,6 @@ def run_predictions_LSTM(model_id, model, window_start_date, window_end_date, ta
 
         narrative_sim_data.setdefault(Tnarrative,y_hat)
         narrative_gt_data.setdefault(Tnarrative,sim_y) 
-        
-        print("Test on narrative: %s"%Tnarrative)
-        ape_value=ape(sim_y,y_hat)
-        print("APE: ",ape_value)
 
-        rmse_value=rmse(sim_y,y_hat)
-        print("RMSE: ",rmse_value)
-
-        nrmse_value=normed_rmse(sim_y,y_hat)
-        print("NRMSE: ",nrmse_value)
-
-        smape_value=smape(sim_y,y_hat)
-        print("SMAPE: ",smape_value)
-
-        Gperformance_data.append([Tnarrative,ape_value,rmse_value,nrmse_value,smape_value,model_id])
-
-    Gperformance_data=pd.DataFrame(Gperformance_data,columns=['informationID','APE','RMSE','NRMSE','SMAPE','MODEL'])
     
-    return Gperformance_data, narrative_sim_data, narrative_gt_data
+    return narrative_sim_data, narrative_gt_data

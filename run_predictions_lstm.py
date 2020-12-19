@@ -164,6 +164,16 @@ end_sim_period=datetime.strptime(end_sim_period,"%Y-%m-%d")
 sim_days = end_sim_period - start_sim_period
 sim_days = sim_days.days + 1
 
+### Save predictions and performance 
+output_path = "./ml_output/{0}/{1}/{2}/".format(domain, platform, prediction_type)
+
+output_dir = "{0}_{1}_{2}_{3}-to-{4}_{5}".format(model_id, str(start_sim_period.strftime("%Y-%m-%d")), str(end_sim_period.strftime("%Y-%m-%d")), str(n_in), str(n_out), version)
+    
+output_path_ = output_path+output_dir+'/'
+
+### Create output directory
+reset_dir(output_path_)
+
 
 if (sim_days % n_out) == 0:
     
@@ -178,24 +188,40 @@ model_lstm = MyLSTM(lstm_layers=lstm_layers, epochs=epochs, batch_size=batch_siz
 
 train_model = model_lstm.lstm_train(data_X, data_y)
 
-Gperformance, narrative_sim, narrative_gt = run_predictions_LSTM(model_id='LSTM', model=train_model, window_start_date=start_sim_period,
+narrative_sim, narrative_gt = run_predictions_LSTM(model_id=model_id, model=train_model, window_start_date=start_sim_period,
                                                                 window_end_date=end_sim_period, target=target, narrative_list=info_ids,
                                                                 features_local=local_features, features_global=global_features,
                                                                 time_in=n_in, time_out=n_out)
 
-### Save predictions and performance 
-output_path = "./ml_output/{0}/{1}/{2}/".format(domain, platform, prediction_type)
+narrative_replay_sim = getReplayBaselinePredictions(window_start_date=start_sim_period,
+                                                                window_end_date=end_sim_period, target=target, narrative_list=info_ids,)
 
-output_dir = "{0}_{1}_{2}_{3}-to-{4}_{5}".format(model_id, str(start_sim_period.strftime("%Y-%m-%d")), str(end_sim_period.strftime("%Y-%m-%d")), str(n_in), str(n_out), version)
-    
-output_path_ = output_path+output_dir+'/'
+narrative_sampling_sim = getSamplingBaselinePredictions(window_start_date=start_sim_period,
+                                                                window_end_date=end_sim_period, target=target, narrative_list=info_ids,)
 
-### Create output directory
-reset_dir(output_path_)
 
+## Evaluation
+print("Evaluation, %s"%model_id)
+Gperformance = eval_predictions(model_id=model_id, gt_data=narrative_gt, sim_data=narrative_sim, narrative_list=info_ids)
+
+bmodel_id='Replay'
+print("\n\n\nEvaluation, %s"%bmodel_id)      
+BRperformance = eval_predictions(model_id=bmodel_id, gt_data=narrative_gt, sim_data=narrative_replay_sim, narrative_list=info_ids)
+
+bmodel_id='Sampling'
+print("\n\n\nEvaluation, %s"%bmodel_id)
+BSperformance = eval_predictions(model_id=bmodel_id, gt_data=narrative_gt, sim_data=narrative_sampling_sim, narrative_list=info_ids)
+                                         
+## Save Results
 Gperformance.to_pickle(output_path_+'Gperformance.pkl.gz')
 pickle.dump(narrative_gt, open(output_path_+'gt_data.pkl.gz', 'wb'))
 pickle.dump(narrative_sim, open(output_path_+'simulations_data.pkl.gz', 'wb'))
+
+BRperformance.to_pickle(output_path_+'BRperformance.pkl.gz')
+pickle.dump(narrative_replay_sim, open(output_path_+'replay_simulations_data.pkl.gz', 'wb'))
+
+BSperformance.to_pickle(output_path_+'BSperformance.pkl.gz')
+pickle.dump(narrative_sampling_sim, open(output_path_+'sampling_simulations_data.pkl.gz', 'wb'))
 
 train_model.save(output_path_+"best_model.h5")
 

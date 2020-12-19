@@ -1,6 +1,7 @@
 import numpy as np
 import pandas as pd
 from matplotlib import pyplot as plt
+import seaborn as sns
 from datetime import datetime, timedelta, date
 import argparse
 import json
@@ -64,26 +65,33 @@ output_path_plots = "{0}/plots".format(output_path_)
 reset_dir(output_path_plots)
 
 
-Gperformance=pd.read_pickle(output_path_+'Gperformance.pkl.gz')
-
+### Timeseries plots.
 with open(output_path_+'gt_data.pkl.gz', 'rb') as fd:
     gt_data=pickle.load(fd)
     
 with open(output_path_+'simulations_data.pkl.gz', 'rb') as fd:
     sim_data=pickle.load(fd)
     
-for info_id in info_ids:
+with open(output_path_+'replay_simulations_data.pkl.gz', 'rb') as fd:
+    replay_sim_data=pickle.load(fd)
     
+with open(output_path_+'sampling_simulations_data.pkl.gz', 'rb') as fd:
+    sampling_sim_data=pickle.load(fd)
+    
+for info_id in info_ids:
+    print("Timeseries plot, %s"%info_id)
     fig, ax = plt.subplots(figsize=(10,6))
 
     plt.plot(gt_data[info_id],label='GT',color='black',lw=4)
-    plt.plot(sim_data[info_id],label='MCAS',color='orange',linestyle='-',lw=4)
+    plt.plot(sim_data[info_id],label='MCAS',color='red',linestyle='-',lw=4)
+    plt.plot(replay_sim_data[info_id],label='Replay',color='blue',linestyle='--',lw=4)
+    plt.plot(sampling_sim_data[info_id],label='Sampling',color='cyan',linestyle=':',lw=4)
 
     plt.legend()
     plt.xlabel("Time (Days)",fontSize=15)
     plt.ylabel("# Tweets",fontSize=15)
     plt.yscale('log',basey=10)
-    plt.title("Narrative: %s"%info_id,fontSize=14,fontweight='bold')
+    plt.title("Topic: %s"%info_id,fontSize=14,fontweight='bold')
     
     times = [(start_sim_period+timedelta(days=i)).strftime("%m-%d") for i in range(sim_days)]
 
@@ -92,7 +100,32 @@ for info_id in info_ids:
     plt.xticks(rotation=90)
     plt.tight_layout()
 
-    plt.savefig('{0}/{1}.pdf'.format(output_path_plots,info_id.replace("/","_")))
+    plt.savefig('{0}/{1}_ts.pdf'.format(output_path_plots,info_id.replace("/","_")))
+    
+    
+### Gperformance plots.
+Gperformance=pd.read_pickle(output_path_+'Gperformance.pkl.gz')
+BRperformance=pd.read_pickle(output_path_+'BRperformance.pkl.gz')
+BSperformance=pd.read_pickle(output_path_+'BSperformance.pkl.gz')
+performance_data=pd.concat([Gperformance,BRperformance,BSperformance])
 
+hue_order_=[model_id,'Replay','Sampling']
+hue_cs_=['red','blue','cyan']
+hue_cs_=sns.color_palette(hue_cs_)
+info_ids_=[x.replace('informationID_','') if 'informationID_' in x else x for x in info_ids]
+for mea in ['APE','RMSE','NRMSE','SMAPE']:
+    print("Performance plot, %s"%mea)
+    g=sns.catplot(x='informationID',y=mea,hue='MODEL',
+                  order=info_ids,
+                hue_order=hue_order_,
+                  palette=hue_cs_,
+                kind='bar',height=6,aspect=2,legend=False,data=performance_data)
+    g.set_xticklabels(info_ids_)
+    plt.xticks(rotation=90)
+    plt.xlabel("Topic",fontSize=15)
+    plt.ylabel(mea,fontSize=15)
+    plt.legend(loc='upper right')
+    plt.tight_layout()
+    plt.savefig('{0}/{1}_performance.pdf'.format(output_path_plots,mea))
 
 
