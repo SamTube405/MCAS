@@ -103,6 +103,15 @@ model_id = config_json['MODEL_PARAMS']
 End of simulation parameters
 """
 
+### define periods
+start_train_period=datetime.strptime(start_train_period,"%Y-%m-%d")
+# Start date must be fixed based on the time lag
+start_train_period=start_train_period+timedelta(days=n_in)
+end_train_period=datetime.strptime(end_train_period,"%Y-%m-%d")
+
+start_sim_period=datetime.strptime(start_sim_period,"%Y-%m-%d")
+end_sim_period=datetime.strptime(end_sim_period,"%Y-%m-%d")
+
 ### Create input directories if not already created
 reset_dir(local_features_path)
 reset_dir(global_features_path)
@@ -130,20 +139,28 @@ if len(target_path) == 0:
 local_features=[]
 global_features=[]
 
-for feature_path in local_features_path:
+for feature_path in target_path:
+    tags = feature_path.split("/")
+    tags = tags[len(tags) - 1].split(".")[0]
+    
     tmp=pd.read_pickle(feature_path)
     tmp=tmp.sort_index()
+    target=tmp.copy()
+
+for feature_path in local_features_path:
+    if tags in feature_path:
+        tmp=pd.read_pickle(feature_path)
+        tmp=tmp.sort_index()
+        tmp=tmp.loc[:start_sim_period-timedelta(days=1)]
+    else:
+        tmp=pd.read_pickle(feature_path)
+        tmp=tmp.sort_index()
     local_features.append(tmp)
 
 for feature_path in global_features_path:
     tmp=pd.read_pickle(feature_path)
     tmp=tmp.sort_index()
     global_features.append(tmp) 
-    
-for feature_path in target_path:
-    tmp=pd.read_pickle(feature_path)
-    tmp=tmp.sort_index()
-    target=tmp.copy()
 
 ### Load information IDs
 info_ids = pd.read_csv(info_ids_path, header=None)
@@ -152,14 +169,6 @@ info_ids = sorted(list(info_ids['informationID']))
 info_ids = ['informationID_'+x if 'informationID' not in x else x for x in info_ids]
 print(len(info_ids),info_ids)
 
-### define periods
-start_train_period=datetime.strptime(start_train_period,"%Y-%m-%d")
-# Start date must be fixed based on the time lag
-start_train_period=start_train_period+timedelta(days=n_in)
-end_train_period=datetime.strptime(end_train_period,"%Y-%m-%d")
-
-start_sim_period=datetime.strptime(start_sim_period,"%Y-%m-%d")
-end_sim_period=datetime.strptime(end_sim_period,"%Y-%m-%d")
 
 sim_days = end_sim_period - start_sim_period
 sim_days = sim_days.days + 1
