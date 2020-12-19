@@ -1,2 +1,3 @@
 metadata/*
 output/*
+*/__pycache__/*
