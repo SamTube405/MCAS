@@ -50,8 +50,8 @@ os.environ["CUDA_VISIBLE_DEVICES"] = "7" # "0, 1" for multiple
 
 ### List of LSTM layers, where value is the number of hidden memory cells at each layer
 lstm_layers = [50]
-epochs=500
-batch_size=14
+epochs=10
+batch_size=16
 loss = 'mse'
 opt='adam'
 
@@ -184,13 +184,13 @@ output_path_ = output_path+output_dir+'/'
 reset_dir(output_path_)
 
 
-if (sim_days % n_out) == 0:
+#if (sim_days % n_out) == 0:
     
-    data_X, data_y = data_prepare_LSTM(start_train_period, end_train_period, target, features_local=local_features,
-                                      features_global=global_features, time_in=n_in, time_out=n_out,
-                                      narrative_list=info_ids)
-else:
-    raise Error('Days to simulate and output window size are not divisible...')
+data_X, data_y = data_prepare_LSTM(start_train_period, end_train_period, target, features_local=local_features,
+                                  features_global=global_features, time_in=n_in, time_out=n_out,
+                                  narrative_list=info_ids)
+#else:
+#    raise Error('Days to simulate and output window size are not divisible...')
     
 model_lstm = MyLSTM(lstm_layers=lstm_layers, epochs=epochs, batch_size=batch_size, shuffle=shuffle, verbose=verbose,
                    loss=loss, opt=opt)
