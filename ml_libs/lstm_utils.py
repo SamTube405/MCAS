@@ -128,9 +128,19 @@ def getSimulationSequenceLSTM(x,xnarrative,target,features_local=[], features_gl
     try:
         ### get target vector.
         target_variable=target.loc[x:x+timedelta(days=time_out-1)][xnarrative].values
+        pad = time_out - target_variable.shape[0]
+        if pad > 0:
+            target_variable=np.append(target_variable, np.array([np.NaN]*pad))
     except:
-        ### if time is out of training range
-        target_variable=[0]*time_out
+        try:
+             ### get target vector.
+            target_variable=target.loc[x:][xnarrative].values
+            pad = time_out - target_variable.shape[0]
+            if pad > 0:
+                target_variable=np.append(target_variable, np.array([np.NaN]*pad))
+        except:
+            ### if time is out of training range
+            target_variable=[0]*time_out
     
     ### create one-hot encoding vector
     Tindex=narrative_list.index(xnarrative)
@@ -368,6 +378,9 @@ def run_predictions_LSTM(model_id, model, window_start_date, window_end_date, ta
     narrative_sim_data={}
     narrative_gt_data={}
     
+    sim_days = window_end_date - window_start_date
+    sim_days = sim_days.days + 1
+    
     number_features_to_scale = len(features_local)+len(features_global)
     for Tnarrative in narrative_list:
         sim_X=[]
@@ -404,6 +417,9 @@ def run_predictions_LSTM(model_id, model, window_start_date, window_end_date, ta
             y_hat.extend(np.round(np.expm1(yhat[0])))
             y_hat_norm.extend(np.log1p(np.round(np.expm1(yhat[0]))))
 
+        y_hat=y_hat[:sim_days]
+        sim_y=sim_y[:sim_days]
+        
         narrative_sim_data.setdefault(Tnarrative,y_hat)
         narrative_gt_data.setdefault(Tnarrative,sim_y) 
 
