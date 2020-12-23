@@ -224,7 +224,7 @@ def data_prepare_LSTM(sim_start_date, sim_end_date, target, features_local=[],
     data_X, data_y
     '''
     
-    number_features_to_scale = len(features_local)+len(features_global)
+    #number_features_to_scale = len(features_local)+len(features_global)
 
     narrative_data={}
     for Tnarrative in narrative_list:
@@ -244,6 +244,8 @@ def data_prepare_LSTM(sim_start_date, sim_end_date, target, features_local=[],
 
         data_X=np.array(data_X)
         data_y=np.array(data_y)
+        
+        number_features_to_scale = data_X.shape[2] - len(narrative_list)
         
         data_X[:,:,:number_features_to_scale] = np.log1p(data_X[:,:,:number_features_to_scale])
         
@@ -381,7 +383,7 @@ def run_predictions_LSTM(model_id, model, window_start_date, window_end_date, ta
     sim_days = window_end_date - window_start_date
     sim_days = sim_days.days + 1
     
-    number_features_to_scale = len(features_local)+len(features_global)
+    #number_features_to_scale = len(features_local)+len(features_global)
     for Tnarrative in narrative_list:
         sim_X=[]
         sim_y=[]
@@ -397,6 +399,7 @@ def run_predictions_LSTM(model_id, model, window_start_date, window_end_date, ta
         sim_y=np.array(sim_y)
         sim_y=sim_y.reshape(-1)
 
+        number_features_to_scale = sim_X.shape[2] - len(narrative_list)
         
         sim_X[:,:,:number_features_to_scale] = np.log1p(sim_X[:,:,:number_features_to_scale])
 
