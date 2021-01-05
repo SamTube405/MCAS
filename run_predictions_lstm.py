@@ -50,7 +50,7 @@ os.environ["CUDA_VISIBLE_DEVICES"] = "7" # "0, 1" for multiple
 
 ### List of LSTM layers, where value is the number of hidden memory cells at each layer
 lstm_layers = [50]
-epochs=10
+epochs=500
 batch_size=16
 loss = 'mse'
 opt='adam'
@@ -113,9 +113,12 @@ start_sim_period=datetime.strptime(start_sim_period,"%Y-%m-%d")
 end_sim_period=datetime.strptime(end_sim_period,"%Y-%m-%d")
 
 ### Create input directories if not already created
-reset_dir(local_features_path)
-reset_dir(global_features_path)
-reset_dir(target_path)
+try:
+    reset_dir(local_features_path)
+    reset_dir(global_features_path)
+    reset_dir(target_path)
+except TypeError as e:
+    print('Directories already created')
 
 ### Check if features and target exist
 
