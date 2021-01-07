@@ -128,9 +128,19 @@ def getSimulationSequenceLSTM(x,xnarrative,target,features_local=[], features_gl
     try:
         ### get target vector.
         target_variable=target.loc[x:x+timedelta(days=time_out-1)][xnarrative].values
+        pad = time_out - target_variable.shape[0]
+        if pad > 0:
+            target_variable=np.append(target_variable, np.array([np.NaN]*pad))
     except:
-        ### if time is out of training range
-        target_variable=[0]*time_out
+        try:
+             ### get target vector.
+            target_variable=target.loc[x:][xnarrative].values
+            pad = time_out - target_variable.shape[0]
+            if pad > 0:
+                target_variable=np.append(target_variable, np.array([np.NaN]*pad))
+        except:
+            ### if time is out of training range
+            target_variable=[0]*time_out
     
     ### create one-hot encoding vector
     Tindex=narrative_list.index(xnarrative)
@@ -214,7 +224,7 @@ def data_prepare_LSTM(sim_start_date, sim_end_date, target, features_local=[],
     data_X, data_y
     '''
     
-    number_features_to_scale = len(features_local)+len(features_global)
+    #number_features_to_scale = len(features_local)+len(features_global)
 
     narrative_data={}
     for Tnarrative in narrative_list:
@@ -234,6 +244,8 @@ def data_prepare_LSTM(sim_start_date, sim_end_date, target, features_local=[],
 
         data_X=np.array(data_X)
         data_y=np.array(data_y)
+        
+        number_features_to_scale = data_X.shape[2] - len(narrative_list)
         
         data_X[:,:,:number_features_to_scale] = np.log1p(data_X[:,:,:number_features_to_scale])
         
@@ -368,7 +380,10 @@ def run_predictions_LSTM(model_id, model, window_start_date, window_end_date, ta
     narrative_sim_data={}
     narrative_gt_data={}
     
-    number_features_to_scale = len(features_local)+len(features_global)
+    sim_days = window_end_date - window_start_date
+    sim_days = sim_days.days + 1
+    
+    #number_features_to_scale = len(features_local)+len(features_global)
     for Tnarrative in narrative_list:
         sim_X=[]
         sim_y=[]
@@ -384,7 +399,8 @@ def run_predictions_LSTM(model_id, model, window_start_date, window_end_date, ta
         sim_y=np.array(sim_y)
         sim_y=sim_y.reshape(-1)
 
-        
+        number_features_to_scale = sim_X.shape[2] - len(narrative_list)
+
         sim_X[:,:,:number_features_to_scale] = np.log1p(sim_X[:,:,:number_features_to_scale])
 
         #sim_X[np.isnan(sim_X)] = 0
@@ -400,10 +416,17 @@ def run_predictions_LSTM(model_id, model, window_start_date, window_end_date, ta
                 sim_X_[np.isnan(sim_X_)] = y_hat_norm[-missing:]
             
             yhat=model.predict(np.expand_dims(sim_X_,axis=0))
+            yhat = yhat[0]
+            yhat = [0 if i < 0 else i for i in yhat]
 
-            y_hat.extend(np.round(np.expm1(yhat[0])))
-            y_hat_norm.extend(np.log1p(np.round(np.expm1(yhat[0]))))
+            #y_hat.extend(np.round(np.expm1(yhat[0])))
+            y_hat.extend(np.round(np.expm1(yhat)))
+            #y_hat_norm.extend(np.log1p(np.round(np.expm1(yhat[0]))))
+            y_hat_norm.extend(np.log1p(np.round(np.expm1(yhat))))
 
+        y_hat=y_hat[:sim_days]
+        sim_y=sim_y[:sim_days]
+        
         narrative_sim_data.setdefault(Tnarrative,y_hat)
         narrative_gt_data.setdefault(Tnarrative,sim_y) 
 
