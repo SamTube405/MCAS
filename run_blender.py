@@ -55,6 +55,7 @@ reset_dir(blend_output_path)
 ### Gperformance plots.
 performance_data=[]
 sim_data={}
+val_data={}
 for xmodel_name in glob("%s*/"%output_path):
     xmodel_name_array=xmodel_name.split("/")[-2].split("_")
     #print(xmodel_names_array)
@@ -67,6 +68,10 @@ for xmodel_name in glob("%s*/"%output_path):
             with open(xmodel_name+'simulations_data.pkl.gz', 'rb') as fd:
                 sim_data_=pickle.load(fd)
                 sim_data.setdefault(xmodel_name,sim_data_)
+                
+            with open(xmodel_name+'validation_data.pkl.gz', 'rb') as fd:
+                val_data_=pickle.load(fd)
+                val_data.setdefault(xmodel_name,val_data_)
             #print(Gperformance.head())
             performance_data.append(Gperformance)
 performance_data=pd.concat(performance_data)
@@ -86,6 +91,18 @@ print("\n\n Blended simulation output ---------------")
 T=performance_data_blended.apply(getBlendedSimulation,axis=1)
 ### Save blended simulation results
 pickle.dump(sim_data_blended, open(blend_output_path+'simulations_data.pkl.gz', 'wb'))
+
+
+val_data_blended={}
+def getBlendedValidation(row):
+    val_array=val_data[row['FILE_NAME']][row['informationID']]
+    print(row['FILE_NAME'],row['informationID'],val_array)
+    val_data_blended.setdefault(row['informationID'],val_array)
+print("\n\n Blended validation output ---------------")    
+T=performance_data_blended.apply(getBlendedValidation,axis=1)
+### Save blended simulation results
+pickle.dump(val_data_blended, open(blend_output_path+'validation_data.pkl.gz', 'wb'))
+    
     
 
 
