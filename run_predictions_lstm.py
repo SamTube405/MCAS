@@ -286,7 +286,7 @@ model_id = best_model
 output_path = "./ml_output/{0}/{1}/{2}/".format(domain, platform, prediction_type)
 
 #output_dir = "{0}_{1}_{2}_{3}-to-{4}_{5}".format(model_id_, str(start_sim_period.strftime("%Y-%m-%d")), str(end_sim_period.strftime("%Y-%m-%d")), str(n_in), str(n_out), model_id)
-output_dir = "{0}_{1}_{2}_{5}".format(model_id_, str(start_sim_period.strftime("%Y-%m-%d")), str(end_sim_period.strftime("%Y-%m-%d")), model_id)
+output_dir = "{0}_{1}_{2}_{3}".format(model_id_, str(start_sim_period.strftime("%Y-%m-%d")), str(end_sim_period.strftime("%Y-%m-%d")), model_id)
     
 output_path_ = output_path+output_dir+'/'
 
