@@ -20,54 +20,54 @@ class SimX:
         self.domain=args[1]
         self.scenario=args[2]
         self.model_identifier=args[3]
-        self.pa=args[4]
        
-        self.pool=ThreadPool(8)
+        self.pool=ThreadPool(32)
         self.sim_outputs=[]
         
-#         self.data_level_degree_list=None
-#         self.initial_degreeV=None
-#         self.initial_degreeV_percentiles=None
-#         self.data_delay_level_degree_root_list=None
+        self.data_level_degree_list=None
+        self.data_delay_level_degree_root_list=None
         
+        self.data_user_list=None
+        self.data_user_followers=None
+        self.data_acts_list=None
+        self.data_acts_list_indexed=None
         
-#         self.data_user_list=None
-        
-#         self.data_user_inf=None
-#         self.inf_user_keys=None
-#         self.inf_user_probs=None
-#         self.inf_level_degree=None
-        
-#         self.data_acts_list=None
-        ##self.data_acts_list_indexed=None
-        
-#         self.data_level_content_list=None
+        self.data_level_content_list=None
 
+#         self.logger = logging.getLogger(__name__)
+#         logPath='./logs/run_simulation_prob_HYDRA_%s_%s_S20001.log'%(self.platform,self.domain)
+#         handler = logging.FileHandler(logPath,mode='w+')
+#         handler.setLevel(logging.INFO)
+#         formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+#         handler.setFormatter(formatter)
+#         self.logger.addHandler(handler)
         
-    def set_metadata(self):
-        print("[Degree by level] loading..")  
-        if self.pa:
-            self.data_level_degree_list=pd.read_pickle("./metadata/probs/%s-%s/cascade_props_inf_degree.pkl.gz"%(self.platform,self.domain))
-        else:
-            self.data_level_degree_list=pd.read_pickle("./metadata/probs/%s-%s/cascade_props_degree.pkl.gz"%(self.platform,self.domain))
-#         degreeList=np.array(self.data_level_degree_list.loc[0]['udegreeV'])
-#         self.inf_level_degree=np.mean(degreeList)
-#         print("[Degree by level] recording star branching ",self.inf_level_degree)
-#         self.initial_degreeV=self.data_level_degree_list.loc[0]['udegreeV']
-#         self.initial_degreeV_percentiles = np.argsort(np.argsort(self.initial_degreeV)) * 100. / (len(self.initial_degreeV) - 1)
-        
-        
-#         print("[Delay sequences by size] loading..")
-#         self.data_delay_level_degree_root_list=pd.read_pickle("./metadata/probs/%s-%s/delay_cond_size.pkl.gz"%(self.platform,self.domain))
+    def set_metadata(self):#,degree_list,delay_list):
+        print("[Degree by level] loading..")     
+        self.data_level_degree_list=pd.read_pickle("./metadata/probs/%s-%s/degree_cond_level.pkl.gz"%(self.platform,self.domain))
 
-        
+        print("[Delay sequences by size] loading..")
+        self.data_delay_level_degree_root_list=pd.read_pickle("./metadata/probs/%s-%s/delay_cond_size.pkl.gz"%(self.platform,self.domain))
+
+
+
+#         self.data_level_degree_list=degree_list
+#         self.data_delay_level_degree_root_list=delay_list
         
         
     def set_user_metadata(self):#,user_list,user_followers):
         print("[User probability] loading..")
         self.data_user_list=pd.read_pickle("./metadata/probs/%s-%s/user_diffusion.pkl.gz"%(self.platform,self.domain))
-        self.data_acts_list=self.data_user_list.groupby("parentUserID").sum()["num_responses"].reset_index(name="# acts")
-        self.data_user_list.set_index("parentUserID",inplace=True)
+        self.data_acts_list=self.data_user_list.groupby("pnodeUserID").sum()["no_responses"].reset_index(name="# acts")
+        
+#         print("[User followers] loading..")
+#         self.data_user_followers=pd.read_pickle("./metadata/probs/%s-%s/user_followers.pkl.gz"%(self.platform,self.domain))
+#         x=np.array(self.data_user_followers["user.followers_count"])
+#         x_ranked=stats.rankdata(x, "average")/len(x)
+#         self.data_user_followers['percentile']=x_ranked
+        
+        #self.data_acts_list_indexed=self.data_acts_list.set_index("pnodeUserID")
+        self.data_user_list.set_index("pnodeUserID",inplace=True)
         
     def set_simulation_metadata(self,content_list):
         self.data_level_content_list=content_list
@@ -96,7 +96,7 @@ class SimX:
     
     def _get_random_user_id(self):
         try:
-            random_user_id=self.data_acts_list.sample(n=1,weights="# acts",replace=True).iloc[0]["parentUserID"]
+            random_user_id=self.data_acts_list.sample(n=1,weights="# acts",replace=True).iloc[0]["pnodeUserID"]
         except KeyError as ke:
             random_user_id=self._get_random_id()
             ##print("new user: ",random_user_id)
@@ -121,22 +121,17 @@ class SimX:
     
     def write_output(self,output,scenario,platform,domain,version):
         scenario=str(scenario)
-        pa_tag="non_inf"
-        if self.pa:
-            pa_tag="inf"
-        version=str(version)+"_"+pa_tag
-        
-            
-        print("version %s"%(version))
+        version=str(version)
+        print("version %s"%version)
         #output_location="./output/%s/%s/%s/%s-%s_v%s.json"%(platform, domain, version, platform, domain, version)
-        output_location="./output/%s/%s/%s/scenario_%s_exog_%s-%s_v%s.json"% (platform,domain,self.model_identifier,self.model_identifier,platform,domain,version)
+        output_location="./output_%s/%s/%s/scenario_%s_domain_%s-%s_v%s.json"% (self.model_identifier,platform,domain,scenario,platform,domain,version)
         output_file = open(output_location, 'w', encoding='utf-8')
         output_records=output.to_dict('records')        
         for d in output_records:
             output_file.write(json.dumps(d) + '\n')
     
         
-    def _get_degree(self,level):
+    def _get_degree(self,level,pa=False):
         sampled_degree=0
         ulevels=set(self.data_level_degree_list.index.get_level_values('level'))
         flag=False;
@@ -147,12 +142,15 @@ class SimX:
           
         degreeList=np.array(self.data_level_degree_list.loc[level]['udegreeV'])
         degreeProbList=np.array(self.data_level_degree_list.loc[level]["probV"])
-
+        if pa:
+            degreeProbList=1/degreeProbList
+            degreeProbList=degreeProbList/np.sum(degreeProbList)
+        ##print(level,degreeList,degreeProbList)
         if len(degreeList)>0:
             sampled_degree = np.random.choice(a=degreeList, p=degreeProbList)
         return sampled_degree
     
-#     def _get_initial_degree(self,level):
+#     def _get_pa_degree(self,level):
 #         sampled_degree=0
 #         ulevels=set(self.data_level_degree_list.index.get_level_values('level'))
 #         flag=False;
@@ -160,47 +158,41 @@ class SimX:
 #             flag=(level in ulevels)
 #             if(flag==False):
 #                 level-=1
-          
+        
+        
 #         degreeList=np.array(self.data_level_degree_list.loc[level]['udegreeV'])
-#         degreeProbList=np.array(self.data_level_degree_list.loc[level]["probV"])
-# #         if pa:
-# #             degreeProbList=1/degreeProbList
-# #             degreeProbList=degreeProbList/np.sum(degreeProbList)
-#         ##print(level,degreeList,degreeProbList)
+#         degreeProbList=np.array(1-self.data_level_degree_list.loc[level]["probV"])
+        
 #         if len(degreeList)>0:
 #             sampled_degree = np.random.choice(a=degreeList, p=degreeProbList)
-#             sampled_degree_index=np.where(degreeList==sampled_degree)[0][0]
-#             print(sampled_degree_index)
-#             sampled_degree_percentile=int(self.initial_degreeV_percentiles[sampled_degree_index])
-#         return sampled_degree,sampled_degree_percentile
-    
+#         return sampled_degree
 
-#     def _get_delayV(self,size):
-#         sample_delays=self.data_delay_level_degree_root_list[self.data_delay_level_degree_root_list["size"]==size]
-#         no_records=sample_delays.shape[0]
+    def _get_delayV(self,size):
+        sample_delays=self.data_delay_level_degree_root_list[self.data_delay_level_degree_root_list["size"]==size]
+        no_records=sample_delays.shape[0]
 
-#         if no_records>0:
-#             sample_delay=sample_delays.sample(n=1, replace=False)
-#             dV=np.array(list(sample_delay["delayV"]))[0]
+        if no_records>0:
+            sample_delay=sample_delays.sample(n=1, replace=False)
+            dV=np.array(list(sample_delay["delayV"]))[0]
 
-#             return dV
+            return dV
 
-#         else:
-#             max_size=self.data_delay_level_degree_root_list["size"].max()
-#             if(size>max_size):
-#                 return self._get_delayV(max_size)
-#             else:
-#                 return self._get_delayV(size+1)
+        else:
+            max_size=self.data_delay_level_degree_root_list["size"].max()
+            if(size>max_size):
+                return self._get_delayV(max_size)
+            else:
+                return self._get_delayV(size+1)
 
-#     def _get_recorrected_delayV(self,size):
-#         dV = self._get_delayV(size)
-#         if(dV.shape[0]>size):
-#             dV=dV[:size]
-#         else:
-#             max_ldelay=np.max(dV)
-#             for n in range(len(dV), size):
-#                 dV=np.append(dV,max_ldelay)
-#         return dV
+    def _get_recorrected_delayV(self,size):
+        dV = self._get_delayV(size)
+        if(dV.shape[0]>size):
+            dV=dV[:size]
+        else:
+            max_ldelay=np.max(dV)
+            for n in range(len(dV), size):
+                dV=np.append(dV,max_ldelay)
+        return dV
     
 #     def _get_contentV(self,level):
 #         ulevels=set(self.data_level_content_list.index.get_level_values('level'))
@@ -233,7 +225,7 @@ class SimX:
   
             ndegree=self._get_degree(level)
             
-            klist=[level,ndegree,mid,pid,nuser_id,puser_id]
+            klist=[level,ndegree,mid,pid,nuser_id]
 
             cascade_tree_matrix.append(klist)
             self._get_synthetic_tree_recursive(level+1,ndegree,cascade_tree_matrix,klist)
@@ -255,36 +247,28 @@ class SimX:
             pdegree=self._get_degree(level)
             
         ## level, my degree, my id, my parent id
-        nlist=[level,pdegree,pid,pid,puser_id,puser_id]
+        nlist=[level,pdegree,pid,pid,puser_id]
         cascade_tree_matrix=self._get_synthetic_tree_recursive(level+1,pdegree,None,nlist)
-        cascade_tree=pd.DataFrame(cascade_tree_matrix,columns=["level","degree","nodeID","parentID","nodeUserID","parentUserID"])
+        cascade_tree=pd.DataFrame(cascade_tree_matrix,columns=["level","degree","nodeID","parentID","nodeUserID"])
         ##print(cascade_tree.shape[0])
         cascade_tree["rootID"]=pid
-        cascade_tree["rootUserID"]=puser_id
         cascade_tree["actionType"]="retweet"  #'retweet
         cascade_tree.loc[:0,"actionType"] ="tweet"
 
         ## attach the delays
         ctree_size=cascade_tree.shape[0]
-#         cascade_tree["long_propagation_delay"]=self._get_recorrected_delayV(ctree_size)
+        cascade_tree["long_propagation_delay"]=self._get_recorrected_delayV(ctree_size)
         return cascade_tree
 
 
     def _simulate(self,ipost):
         
-        ipost_id=ipost['nodeID']
-        ipost_user=ipost['nodeUserID']
+        ipost_id=ipost['id_h']
+        ipost_user=ipost['author_h']
         ipost_degree=None
-        ipost_created_date=str(ipost['nodeTime'])
-        ipost_infoID=ipost['informationID']
-                    
-        #### head changed, influentials assigned
-#         ipost_degree, ipost_degree_percentile=self._get_initial_degree(0)
-#         inf_user_index = int(np.percentile(self.inf_user_probs, ipost_degree_percentile))
-#         print("Inf",inf_user_index)
-#         ipost_user=self.inf_user_keys[inf_user_index]
+            
 
-        
+        ipost_created_date=str(ipost['created_date'])
         ##ipost_subreddit=ipost['subreddit_id']
 
         ##print("started: ",start)
@@ -299,9 +283,7 @@ class SimX:
         # assign times
         ipost_tree["nodeTime"]=ipost_created_date
         ipost_tree["nodeTime"]=pd.to_datetime(ipost_tree["nodeTime"])
-#         ipost_tree["nodeTime"]+=ipost_tree["long_propagation_delay"]
-        
-        ipost_tree["informationID"]=ipost_infoID
+        ipost_tree["nodeTime"]+=ipost_tree["long_propagation_delay"]
 
 #         # assign authors
 #         ipost_tree_size=ipost_tree.shape[0]
@@ -311,13 +293,13 @@ class SimX:
 #         ipost_tree.loc[:0,"nodeUserID"]=ipost_user
 
 
-        icols=["nodeID","nodeUserID","parentID", "parentUserID", "rootID", "rootUserID", "actionType", "nodeTime","informationID"]
+        icols=["nodeID","nodeUserID","parentID", "rootID", "actionType", "nodeTime"]
         ipost_tree=ipost_tree[icols]
 
         ## change to timestamp
         ipost_tree["nodeTime"]=ipost_tree["nodeTime"].values.astype(np.int64) // 10 ** 9
         
-        print("[simulation] infoID: %s, post id: %s, author: %s, timestamp: %s, cascade size: %d"%(ipost_infoID,ipost_id,ipost_user,ipost_created_date,ipost_tree.shape[0]))
+        print("[simulation] post id: %s, author: %s, timestamp: %s, cascade size: %d"%(ipost_id,ipost_user,ipost_created_date,ipost_tree.shape[0]))
 
 #         ## assign communityID
 #         ipost_tree["communityID"]=ipost_subreddit
@@ -327,12 +309,7 @@ class SimX:
     
     def _run_simulate(self,iposts_records,version):
         start = time.time()
-        issued=0
-        total_issued=len(iposts_records)
         for ipost in iposts_records:
-            issued+=1
-            if issued%1000==0:
-                print("%s job progress: %f"%(version,((issued/total_issued)*100)))
             ##self._simulate(ipost)
             self.pool.add_task(self._simulate,ipost)
         self.pool.wait_completion()
