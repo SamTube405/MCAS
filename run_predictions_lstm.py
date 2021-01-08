@@ -50,7 +50,7 @@ os.environ["CUDA_VISIBLE_DEVICES"] = "7" # "0, 1" for multiple
 
 ### List of LSTM layers, where value is the number of hidden memory cells at each layer
 lstm_layers = [[50], [20], [5]]
-epochs=5
+epochs=250
 batch_size=16
 loss = 'mse'
 opt='adam'
@@ -263,8 +263,13 @@ performance_df.loc[performance_df['NRMSE_x']<performance_df['NRMSE_y'], 'win2'] 
 performance_df['wins'] = performance_df['win1']+performance_df['win2']
 
 ### In case of Tie, save model with lowest avg. RMSE
-performance_df=performance_df.groupby('MODEL_x').agg({'wins':'sum', 'RMSE_x':'mean'}).reset_index()
-performance_df=performance_df.sort_values(['wins', 'RMSE_x'], ascending=[False, True]).reset_index(drop=True)
+#performance_df=performance_df.groupby('MODEL_x').agg({'wins':'sum', 'RMSE_x':'mean'}).reset_index()
+#performance_df=performance_df.sort_values(['wins', 'RMSE_x'], ascending=[False, True]).reset_index(drop=True)
+
+### Get best model based on lowest RMSE
+performance_df=performance_df.groupby('MODEL_x').agg({'wins':'sum', 'RMSE_x':'median'}).reset_index()
+performance_df=performance_df.sort_values('RMSE_x', ascending=True).reset_index(drop=True)
+
 print("Performance Statistics")
 print(performance_df)
 
