@@ -29,10 +29,11 @@ class Node(object):
         return self.node_long_delay
     
 class Cascade(object):
-    def __init__(self,domain,platform,data_path):
-        self.domain=domain
+    def __init__(self,platform,domain,scenario,data_path):
         self.platform=platform
-        self.output_dir="./metadata/probs/%s-%s"%(self.platform,self.domain)
+        self.domain=domain
+        self.scenario=scenario
+        self.output_dir="./metadata/probs/%s-%s-%s"%(self.platform,self.domain,self.scenario)
         create_dir(self.output_dir)
         
         self.pool = ThreadPool(128) 
@@ -64,10 +65,11 @@ class Cascade(object):
         self.cascade_records.to_pickle("%s/cascade_records.pkl.gz"%(self.output_dir))
         
     def get_user_diffusion(self):
-        user_diffusion=self.cascade_records.groupby(['parentUserID','nodeUserID']).size().reset_index(name='num_responses')
-        user_diffusion_=self.cascade_records.groupby(['parentUserID']).size().reset_index(name='total_num_responses')
+        user_diffusion=self.cascade_records.query('actionType=="response"').groupby(['parentUserID','nodeUserID']).size().reset_index(name='num_responses')
+        user_diffusion_=self.cascade_records.query('actionType=="response"').groupby(['parentUserID']).size().reset_index(name='total_num_responses')
         user_diffusion=pd.merge(user_diffusion,user_diffusion_,on='parentUserID',how='inner')
         user_diffusion['prob']=user_diffusion['num_responses']/user_diffusion['total_num_responses']
+        user_diffusion.sort_values(['parentUserID','prob'],ascending=False,inplace=True)
         user_diffusion.to_pickle("%s/user_diffusion.pkl.gz"%(self.output_dir))
         return user_diffusion
     
@@ -285,7 +287,7 @@ class Cascade(object):
 cpath='/data/DevHub/recur-cascades/WWW2021/cpec_resources/cascade_records_0106_0107.pkl.gz'
 #cpath='/data/DevHub/recur-cascades/WWW2021/cpec_resources/cascade_records_XhYAfMuJfDEBxtk_YuRV4A.pkl.gz'
 
-cas=Cascade("cpec","twitter-gt",cpath)
+cas=Cascade("twitter","cpec","coldrun",cpath)
 cas.prepare_data()
 
 user_spread_info=cas.get_user_spread_info()

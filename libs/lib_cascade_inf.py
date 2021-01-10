@@ -19,118 +19,139 @@ class SimX:
         self.platform=args[0]
         self.domain=args[1]
         self.scenario=args[2]
-        self.model_identifier=args[3]
-        self.pa=args[4]
+        self.pa=args[3]
        
         self.pool=ThreadPool(8)
         self.sim_outputs=[]
-        
-#         self.data_level_degree_list=None
-#         self.initial_degreeV=None
-#         self.initial_degreeV_percentiles=None
-#         self.data_delay_level_degree_root_list=None
-        
-        
-#         self.data_user_list=None
-        
-#         self.data_user_inf=None
-#         self.inf_user_keys=None
-#         self.inf_user_probs=None
-#         self.inf_level_degree=None
-        
-#         self.data_acts_list=None
-        ##self.data_acts_list_indexed=None
-        
-#         self.data_level_content_list=None
-
+        self.output_location="./output/%s/%s/%s"% (self.platform,self.domain,self.scenario)
         
     def set_metadata(self):
         print("[Degree by level] loading..")  
         if self.pa:
-            self.data_level_degree_list=pd.read_pickle("./metadata/probs/%s-%s/cascade_props_inf_degree.pkl.gz"%(self.platform,self.domain))
+            self.data_level_degree_list=pd.read_pickle("./metadata/probs/%s-%s-%s/cascade_props_inf_degree.pkl.gz"%(self.platform,self.domain,self.scenario))
         else:
-            self.data_level_degree_list=pd.read_pickle("./metadata/probs/%s-%s/cascade_props_degree.pkl.gz"%(self.platform,self.domain))
-#         degreeList=np.array(self.data_level_degree_list.loc[0]['udegreeV'])
-#         self.inf_level_degree=np.mean(degreeList)
-#         print("[Degree by level] recording star branching ",self.inf_level_degree)
-#         self.initial_degreeV=self.data_level_degree_list.loc[0]['udegreeV']
-#         self.initial_degreeV_percentiles = np.argsort(np.argsort(self.initial_degreeV)) * 100. / (len(self.initial_degreeV) - 1)
-        
+            self.data_level_degree_list=pd.read_pickle("./metadata/probs/%s-%s-%s/cascade_props_degree.pkl.gz"%(self.platform,self.domain,self.scenario))
         
 #         print("[Delay sequences by size] loading..")
 #         self.data_delay_level_degree_root_list=pd.read_pickle("./metadata/probs/%s-%s/delay_cond_size.pkl.gz"%(self.platform,self.domain))
-
-        
-        
+    
         
     def set_user_metadata(self):#,user_list,user_followers):
         print("[User probability] loading..")
-        self.data_user_list=pd.read_pickle("./metadata/probs/%s-%s/user_diffusion.pkl.gz"%(self.platform,self.domain))
-        self.data_acts_list=self.data_user_list.groupby("parentUserID").sum()["num_responses"].reset_index(name="# acts")
+        self.data_user_list=pd.read_pickle("./metadata/probs/%s-%s-%s/user_diffusion.pkl.gz"%(self.platform,self.domain,self.scenario))
+        self.data_user_ego=self.data_user_list.groupby("parentUserID").size().reset_index(name="num_neighbors")
+        self.data_user_ego.set_index("parentUserID",inplace=True)
+        
+        self.data_acts_list=self.data_user_list.groupby("nodeUserID").sum()["num_responses"].reset_index(name="num_acts")
+        self.data_acts_list.set_index("nodeUserID",inplace=True)
+        
         self.data_user_list.set_index("parentUserID",inplace=True)
         
-    def set_simulation_metadata(self,content_list):
-        self.data_level_content_list=content_list
+#     def set_simulation_metadata(self,content_list):
+#         self.data_level_content_list=content_list
         
-    def doSanity(self):
-        # ## Given any level, return a node with degree X
-        level=200
-        b = self._get_degree(level)
-        print("[sanity] Level: %d, Sampled Degree: %d"%(level,b))
+#     def doSanity(self):
+#         # ## Given any level, return a node with degree X
+#         level=200
+#         b = self._get_degree(level)
+#         print("[sanity] Level: %d, Sampled Degree: %d"%(level,b))
 
 
-        ## Given any size of the cascade, return a vector of delays
-        size=10000
-        dV = self._get_recorrected_delayV(size)
-        print("[sanity] Expected: %d, Returned: %d Sampled Delay Vector: "%(size,dV.shape[0]),dV)
+#         ## Given any size of the cascade, return a vector of delays
+#         size=10000
+#         dV = self._get_recorrected_delayV(size)
+#         print("[sanity] Expected: %d, Returned: %d Sampled Delay Vector: "%(size,dV.shape[0]),dV)
 
-        # ## Given any degree in the first level, return an arbitrary cascade tree
-        root_degree=3
-        ctree=self._gen_cascade_tree(root_degree)
-        print("[sanity] generated cascade tree")
-        print(ctree)
+#         # ## Given any degree in the first level, return an arbitrary cascade tree
+#         root_degree=3
+#         ctree=self._gen_cascade_tree(root_degree)
+#         print("[sanity] generated cascade tree")
+#         print(ctree)
         
     def _get_random_id(self):
         hash = random.getrandbits(64)
         return "%16x"%hash
     
     def _get_random_user_id(self):
-        try:
-            random_user_id=self.data_acts_list.sample(n=1,weights="# acts",replace=True).iloc[0]["parentUserID"]
-        except KeyError as ke:
-            random_user_id=self._get_random_id()
+        hash = random.getrandbits(64)
+        return "gen_%16x"%hash
+    
+    def _get_activity_biased_user_id(self):
+        #try:
+        random_user_id=self.data_acts_list.sample(n=1,weights="num_acts",replace=True).index[0]
+        #print('Activity biased user assigned, id: %s'%(random_user_id))
+#         except KeyError as ke:
+#             random_user_id=self._get_random_user_id()
             ##print("new user: ",random_user_id)
             
         return random_user_id
     
-    def _get_neighbor_user_id(self,user_id):
-        try:
-            ###random_user_id=self.data_user_list.loc[user_id].sample(n=1,weights="prob",replace=True).iloc[0]["source_author"]
-            ##print(self.data_user_list[self.data_user_list['target_author']==user_id])
-            neighbors=self.data_user_list.loc[user_id]#self.data_user_list[self.data_user_list['pnodeUserID']==user_id]
-            if neighbors.shape[0]>0:
-                random_user_id=neighbors.sample(n=1,weights="prob",replace=True).iloc[0]["nodeUserID"]
-            else:
-                random_user_id=self._get_random_user_id()
-        except:
-            random_user_id=self._get_random_user_id()
-        return random_user_id
-
-    def _get_random_users(self,size):
-        return [self._get_random_id() for i in range(size)]
-    
-    def write_output(self,output,scenario,platform,domain,version):
-        scenario=str(scenario)
-        pa_tag="non_inf"
-        if self.pa:
-            pa_tag="inf"
-        version=str(version)+"_"+pa_tag
-        
+    def _get_ego_biased_user_id(self,degree):
+        #try:
+        hops=self.data_user_ego.query('num_neighbors>@degree')
+        if hops.shape[0]>0:
+            random_user_id=hops.sample(n=1,weights="num_neighbors").index[0]
+            #print('Ego biased seed user assigned, id: %s, degree: %d'%(random_user_id,degree))
+        else:
+            random_user_id=self._get_activity_biased_user_id()
+        #except KeyError as ke:
             
-        print("version %s"%(version))
-        #output_location="./output/%s/%s/%s/%s-%s_v%s.json"%(platform, domain, version, platform, domain, version)
-        output_location="./output/%s/%s/%s/scenario_%s_exog_%s-%s_v%s.json"% (platform,domain,self.model_identifier,self.model_identifier,platform,domain,version)
-        output_file = open(output_location, 'w', encoding='utf-8')
+            
+        return random_user_id
+    
+    def _get_ego_hop_biased_user_id(self,user_id,degree):
+        try:
+            neighbor_ids=list(self.data_user_list.loc[user_id]['nodeUserID'])
+            #print(neighbor_ids)
+            hop_neighbors=self.data_user_ego[self.data_user_ego.index.isin(neighbor_ids)]
+            #print("# neighbor diffusions: %d, reqd %d children"%(hop_neighbors.shape[0],degree))
+            hop_neighbors=hop_neighbors.query('num_neighbors>@degree')
+            #print("# satisfied neighbor diffusions: %d, reqd %d children"%(hop_neighbors.shape[0],degree))
+            if hop_neighbors.shape[0]>0:
+                random_user_id=hop_neighbors.sample(n=1,weights="num_neighbors",replace=False).index[0]
+                #print('Ego biased hop user assigned, id: %s, degree: %d'%(random_user_id,degree))
+            else:
+                random_user_id=self._get_activity_biased_user_id()
+        except KeyError as ke:
+            random_user_id=self._get_activity_biased_user_id()
+            
+        return random_user_id
+    
+#     def _get_neighbor_user_id(self,user_id):
+#         try:
+#             ###random_user_id=self.data_user_list.loc[user_id].sample(n=1,weights="prob",replace=True).iloc[0]["source_author"]
+#             ##print(self.data_user_list[self.data_user_list['target_author']==user_id])
+#             neighbors=self.data_user_list.loc[user_id]#self.data_user_list[self.data_user_list['pnodeUserID']==user_id]
+#             if neighbors.shape[0]>0:
+#                 random_user_id=neighbors.sample(n=1,weights="prob",replace=True).iloc[0]["nodeUserID"]
+#             else:
+#                 random_user_id=self._get_random_user_id()
+#         except:
+#             random_user_id=self._get_random_user_id()
+#         return random_user_id
+    
+#     def _get_neighbor_user_id_vector(self,user_id,num_neighbors):
+#         #try:
+#         neighbors=self.data_user_list.loc[user_id]
+#         print("# neighbors %d, reqd %d"%(neighbors.shape[0],num_neighbors))
+#         if neighbors.shape[0]>=num_neighbors:
+#             neighbor_user_ids=list(neighbors.sample(n=num_neighbors,weights="prob",replace=False)["nodeUserID"])
+#         else:
+#             neighbor_user_ids=list(neighbors.iloc[0:neighbors.shape[0]]["nodeUserID"])
+#             num_extra_neighbors=num_neighbors-neighbors.shape[0]
+#             random_user_ids=[self._get_activity_biased_user_id() for _ in range(num_extra_neighbors)]
+#             neighbor_user_ids.extend(random_user_ids)
+# #         except:
+# #             print('Warning, no neighbors detected for this user id, %s'%user_id)
+# #             neighbor_user_ids=[self._get_activity_biased_user_id() for _ in range(num_neighbors)]
+#         return neighbor_user_ids
+
+#     def _get_random_users(self,size):
+#         return [self._get_random_id() for i in range(size)]
+    
+    def write_output(self,output,version):
+        output_loc="%s/cascade_v%s.json"% (self.output_location,version)
+        output_file = open(output_loc, 'w', encoding='utf-8')
         output_records=output.to_dict('records')        
         for d in output_records:
             output_file.write(json.dumps(d) + '\n')
@@ -220,24 +241,28 @@ class SimX:
             cascade_tree_matrix=[]
             cascade_tree_matrix.append(nlist)
 
-        children=pdegree
+        pid=nlist[2]
+        puser_id=nlist[4]
+        num_children=pdegree
 
-        while(children>0):
+        #nuser_ids=self._get_neighbor_user_id_vector(puser_id,num_children)
+        
+        index=0
+        while(index<num_children):
             mid=self._get_random_id()
-            pid=nlist[2]
-            puser_id=nlist[4]
             
-            
-            nuser_id=self._get_neighbor_user_id(puser_id)
+            ##nuser_id=self._get_neighbor_user_id(puser_id)
             ###nuser_id=self._get_random_id()
+            #nuser_id=nuser_ids[index]
   
             ndegree=self._get_degree(level)
+            nuser_id=self._get_ego_hop_biased_user_id(puser_id,ndegree)
             
             klist=[level,ndegree,mid,pid,nuser_id,puser_id]
 
             cascade_tree_matrix.append(klist)
             self._get_synthetic_tree_recursive(level+1,ndegree,cascade_tree_matrix,klist)
-            children-=1
+            index+=1
 
         return cascade_tree_matrix
 
@@ -247,16 +272,22 @@ class SimX:
         ## post id
         if pid is None:
             pid=self._get_random_id()
-        ## post user id 
-        if puser_id is None:
-            puser_id=self._get_random_user_id()
         ## post degree
         if pdegree is None:
             pdegree=self._get_degree(level)
+        ## post user id 
+        if puser_id is None:
+            puser_id=self._get_ego_biased_user_id(pdegree)
+            
+        
+        
             
         ## level, my degree, my id, my parent id
         nlist=[level,pdegree,pid,pid,puser_id,puser_id]
-        cascade_tree_matrix=self._get_synthetic_tree_recursive(level+1,pdegree,None,nlist)
+        if pdegree>0:
+            cascade_tree_matrix=self._get_synthetic_tree_recursive(level+1,pdegree,None,nlist)
+        else:
+            cascade_tree_matrix=[nlist]
         cascade_tree=pd.DataFrame(cascade_tree_matrix,columns=["level","degree","nodeID","parentID","nodeUserID","parentUserID"])
         ##print(cascade_tree.shape[0])
         cascade_tree["rootID"]=pid
@@ -273,7 +304,7 @@ class SimX:
     def _simulate(self,ipost):
         
         ipost_id=ipost['nodeID']
-        ipost_user=ipost['nodeUserID']
+        ipost_user=None#ipost['nodeUserID']
         ipost_degree=None
         ipost_created_date=str(ipost['nodeTime'])
         ipost_infoID=ipost['informationID']
@@ -291,10 +322,6 @@ class SimX:
         ##print("[simulation] post id: %s, author: %s, timestamp: %s"%(ipost_id,ipost_user,ipost_created_date))
 
         ipost_tree=self._gen_cascade_tree(ipost_id,ipost_user,ipost_degree)
-        ##print("-",ipost_tree)
-        # change the post id
-#         assigned_rootID=ipost_tree['rootID'].iloc[0]
-#         ipost_tree.replace({assigned_rootID: ipost_id}, regex=True,inplace=True)
 
         # assign times
         ipost_tree["nodeTime"]=ipost_created_date
@@ -317,7 +344,9 @@ class SimX:
         ## change to timestamp
         ipost_tree["nodeTime"]=ipost_tree["nodeTime"].values.astype(np.int64) // 10 ** 9
         
-        print("[simulation] infoID: %s, post id: %s, author: %s, timestamp: %s, cascade size: %d"%(ipost_infoID,ipost_id,ipost_user,ipost_created_date,ipost_tree.shape[0]))
+        ipost_user=ipost_tree.iloc[0]['rootUserID']
+        
+        print("[simulation] infoID: %s, post id: %s, viral: %r, author: %s, timestamp: %s, cascade size: %d"%(ipost_infoID,ipost_id,self.pa,ipost_user,ipost_created_date,ipost_tree.shape[0]))
 
 #         ## assign communityID
 #         ipost_tree["communityID"]=ipost_subreddit
@@ -347,5 +376,5 @@ class SimX:
         print("[simulation completed] version: %s, # cascades: %d,%d, # acts: %d, Elapsed %.3f seconds."%(version, no_cascades,sim_output['rootID'].nunique(),no_acts,elapsed))
 
 
-        self.write_output(sim_output,scenario=self.scenario,platform=self.platform,domain=self.domain,version=version)
+        self.write_output(sim_output,version=version)
         

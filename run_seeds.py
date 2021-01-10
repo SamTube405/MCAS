@@ -1,128 +1,125 @@
-import random
-import pandas as pd
 import numpy as np
-from collections import Counter
-from keras.models import load_model
-from sklearn.preprocessing import MinMaxScaler
+import pandas as pd
+from matplotlib import pyplot as plt
+import seaborn as sns
 from datetime import datetime, timedelta, date
-import os,sys,pickle
-from gensim.models import Word2Vec
+import argparse
+import json
+import shutil,os
+from os import listdir
+from os.path import isfile, join
+import pickle
+from glob import glob
+import random
 
 def daterange(start_date, end_date):
     for n in range(int ((end_date - start_date).days)):
         yield start_date + timedelta(n)
-
-sim_start_date="2019-02-15"
-sim_end_date="2019-02-28"
-sim_platform="twitter"
-exog_taste="news"
-exog_taste_="%s_pday_8pm"%exog_taste
-
+        
+def create_dir(x_dir):
+    if not os.path.exists(x_dir):
+        os.makedirs(x_dir)
+        print("Created new dir. %s"%x_dir)
 
 
-sim_start_date=datetime.strptime(sim_start_date,"%Y-%m-%d")
-sim_end_date=datetime.strptime(sim_end_date,"%Y-%m-%d")
+def reset_dir(x_dir):
+    fn=create_dir(x_dir)
+
+"""
+Load the simulation parameters
+"""
+parser = argparse.ArgumentParser(description='Simulation Parameters')
+parser.add_argument('--config', dest='config_file_path', type=argparse.FileType('r'))
+args = parser.parse_args()
+
+config_json=json.load(args.config_file_path)
+#print(config_json)
+
+# version = config_json['VERSION_TAG']
+domain = config_json['DOMAIN']
+platform = config_json['PLATFORM']
+start_sim_period = config_json['start_sim_period']
+end_sim_period = config_json['end_sim_period']
+sim_start_date=datetime.strptime(start_sim_period,"%Y-%m-%d")
+sim_end_date=datetime.strptime(end_sim_period,"%Y-%m-%d")
 oneD=timedelta(days=1)
 
-sim_start_date_d_oned_text=(sim_start_date-oneD).strftime("%Y-%m-%d")
+info_ids_path = config_json['INFORMATION_IDS']
+info_ids_path = info_ids_path.format(domain)
 
-with open('../vz_prediction_seed_output/narrative_sim_data_seed_%s.pkl'%exog_taste_, 'rb') as f:
-    narrative_seed_data=pickle.load(f) 
-sim_narratives=list(narrative_seed_data.keys())
+### Load information IDs
+info_ids = pd.read_csv(info_ids_path, header=None)
+info_ids.columns = ['informationID']
+info_ids = sorted(list(info_ids['informationID']))
+info_ids = ['informationID_'+x if 'informationID' not in x else x for x in info_ids]
+print(len(info_ids),info_ids)
 
-seed_users=pd.read_pickle("./metadata/probs/twitter-venezuela/influentials_followers.pkl.gz")
-seed_users['normed_no_tweets']=seed_users['no_tweets']/seed_users['no_tweets'].sum()
-#print(seed_users.head())        
-# print("exog networks loading....",exog_taste)
-# exog_network_dataset=pd.read_pickle("resources/%s_network_dataset.pkl.gz"%exog_taste)
+#output_path = "./ml_output/{0}/{1}/{2}/".format(domain, platform, prediction_type)
+blend_output_path_seed = "./ml_output/{0}/{1}/{2}/BLEND_{3}_{4}/".format(domain, platform, "seed",start_sim_period,end_sim_period)
+blend_output_path_seed_inf = "./ml_output/{0}/{1}/{2}/BLEND_{3}_{4}/".format(domain, platform, "seed_inf",start_sim_period,end_sim_period)
 
-# print("skipgrams loading....",exog_taste)
-# skipgram_model=Word2Vec.load("resources/skipgram_%s_%s.model"%(exog_taste,sim_platform))
-# ###### -------------------------------------------sim_start_date_d_oned_text
+print("[Seed counts] loading..")
+with open(blend_output_path_seed+'simulations_data.pkl.gz', 'rb') as fd:
+    sim_data_seed=pickle.load(fd)
 
+print("[Seed Inf counts] loading..")
+with open(blend_output_path_seed_inf+'simulations_data.pkl.gz', 'rb') as fd:
+    sim_data_seed_inf=pickle.load(fd)
 
-
-
-
-
-
-# def getUserIdentities(test_day_text):
-#     ##print("Predicting seed user identities..")
-#     test_day_text_start_epoch="%s 00:00"%test_day_text
-#     test_day_text_end_epoch="%s 23:59"%test_day_text
-#     exog_users=exog_network_dataset.loc[test_day_text_start_epoch:test_day_text_end_epoch].groupby('nodeUserID').size().sort_values(ascending=False)
-
-#     exog_neighbors=[]
-#     for guser,v in exog_users.iteritems():
-#         if guser in skipgram_model.wv:
-#             normal_neighbors = skipgram_model.wv.most_similar_cosmul([skipgram_model.wv[guser]], topn=500)
-#             neighbors = pd.DataFrame(normal_neighbors, columns=['nodeUserID', 'hits'])
-            
-#             neighbors['hits']=neighbors['hits']*v
-#             exog_neighbors.append(neighbors)
-
-                
-#     ## predicted
-#     exog_neighbors=pd.concat(exog_neighbors).groupby('nodeUserID')['hits'].sum().reset_index()#.sort_values(by='hits',ascending=False)
-    
-#     ## Filtering, excluding exog users, and including only old seed users
-#     #exog_neighbors=pd.merge(exog_neighbors,seed_users,left_index=True,right_index=True)
-#     exog_neighbors=pd.merge(exog_neighbors,seed_users,on='nodeUserID',how='inner')
-#     #exog_neighbors=exog_neighbors[exog_neighbors['nodeUserID'].isin(seed_users)==True]
-        
-#     exog_neighbors['hits']=exog_neighbors['normed_no_seeds']/exog_neighbors['normed_no_seeds'].sum()
-#     ##exog_neighbors['hits']=exog_neighbors['hits']/exog_neighbors['hits'].sum()
-#     ##exog_neighbors.reset_index(inplace=True)
-#     print("# seed user identities: ",exog_neighbors.shape[0])
-#     return exog_neighbors
-
-
-
-
-filePath='output/seeds_%s_mcas_exog_taste_%s_dates_%s_%s.csv'%(sim_platform,exog_taste_,sim_start_date.strftime("%Y-%m-%d"),sim_end_date.strftime("%Y-%m-%d"))
+blend_output_path_seed_cascade = "./ml_output/{0}/{1}/{2}/BLEND_{3}_{4}/".format(domain, platform, "seed_cascade",start_sim_period,end_sim_period)
+reset_dir(blend_output_path_seed_cascade)
+filePath="%ssimulations_data.csv"%blend_output_path_seed_cascade  
 if os.path.exists(filePath):
     os.remove(filePath)
     print("Existing file deleted.")
-                                                               
 fd=open(filePath,'a')
 
 global_event_count=0
-for Tnarrative in sim_narratives:
+for info_id in info_ids:
+    
+    
+    ######
     index=0
-    seed_data=narrative_seed_data[Tnarrative]
-    ##seed_narrative_users=seed_users.loc[Tnarrative]
+    seed_viral=False
+    seed_data=sim_data_seed[info_id]
     for sim_day in daterange(sim_start_date, sim_end_date+oneD):
         sim_day_text=sim_day.strftime("%Y-%m-%d")
         seed_count=int(seed_data[index])
-        print("Day: %s, Narrative: %s, # seeds: %d"%(sim_day_text,Tnarrative, seed_count))
+        print("Day: %s, InfoID: %s, # seeds: %d"%(sim_day_text,info_id, seed_count))
         if seed_count<=0:
             continue
         global_event_count+=seed_count
         index+=1
-        
-        
-#         ## who are the seed authors
-#         seed_user_ids=getUserIdentities(sim_day_text)
-#         ## oldies are half
-#         no_oldies=int(seed_count/2)
-#         seed_user_ids=list(seed_user_ids.sample(no_oldies, weights='hits', replace=True)['nodeUserID'])
-#         ## newbies come
-#         no_newbies=seed_count-no_oldies
-#         seed_user_ids_=list(seed_users.sample(no_newbies, replace=True)['nodeUserID'])
-#         ## oldies + newbies
-#         seed_user_ids.extend(seed_user_ids_)
-
-        seed_user_ids=list(seed_users.sample(seed_count, weights='normed_no_tweets',replace=True).index)
-
-        print("%d authors perform %d seeds"%(len(set(seed_user_ids)),seed_count))
-        assert(len(seed_user_ids)==seed_count)
-
 
         for seed_index in range(seed_count):
             seed_identifier = "seed_%16x"%random.getrandbits(64)
-            seed_user_id=seed_user_ids[seed_index]
-            fd.write("%s,%s,%s,%s\n"%(sim_day_text,seed_identifier,seed_user_id,Tnarrative))
+            seed_user_id=None
+            fd.write("%s,%s,%s,%s,%s\n"%(sim_day_text,seed_identifier,seed_user_id,seed_viral,info_id))
+            
+            
+    ######
+    index=0
+    seed_viral=True
+    seed_data=sim_data_seed_inf[info_id]
+    for sim_day in daterange(sim_start_date, sim_end_date+oneD):
+        sim_day_text=sim_day.strftime("%Y-%m-%d")
+        seed_count=int(seed_data[index])
+        print("Day: %s, InfoID: %s, # seeds: %d"%(sim_day_text,info_id, seed_count))
+        if seed_count<=0:
+            continue
+        global_event_count+=seed_count
+        index+=1
+
+        for seed_index in range(seed_count):
+            seed_identifier = "seed_%16x"%random.getrandbits(64)
+            seed_user_id=None
+            fd.write("%s,%s,%s,%s,%s\n"%(sim_day_text,seed_identifier,seed_user_id,seed_viral,info_id))
             
             
 print("Saved seeds at %s"%filePath)
 print("Total # seeds: ",global_event_count)
+
+   
+
+
+

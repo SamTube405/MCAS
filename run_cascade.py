@@ -62,28 +62,24 @@ def reset_dir(x_dir):
 
 def _get_input_messages(path):
     input_messages=pd.read_csv(path,header=None)
-    input_messages.columns=['nodeTime','nodeID','nodeUserID','informationID']
-    ##input_messages.set_index(pd.DatetimeIndex(input_messages['nodeTime']),inplace=True)
+    input_messages.columns=['nodeTime','nodeID','nodeUserID','isViral','informationID']
     infoIDs=input_messages['informationID'].unique()
     print("Presence: ",infoIDs.shape[0],infoIDs)
-    ##input_messages=input_messages.iloc[0:100]
-    
-#     input_messages_array=[]
-#     for infoID in infoIDs:
-#         input_messages_=input_messages.query('informationID==@infoID')
-#         input_messages_array.append(input_messages_)
-    input_messages_array=np.array_split(input_messages, NUMBER_OF_SEED_CHUNKS)
-    return input_messages_array
+    return input_messages
 
 
 def _run(args):
     iposts_records=args[0]
     index=args[1]
-    version="%s-%d"%(version_tag,index)
+    pa=args[2]
+    pa_tag='regular'
+    if pa:
+        pa_tag='viral'
+    version="%s-pa-%s-block-%d"%(version_tag,pa_tag,index)
     print("[started][job] %s, # seeds: %d"%(version,iposts_records.shape[0]))
     iposts_records=iposts_records.to_dict(orient='records')
     
-    simX=SimX(platform,domain,scenario,model_identifier)
+    simX=SimX(platform,domain,scenario,pa)
     simX.set_metadata()
     simX.set_user_metadata()
     
@@ -104,17 +100,15 @@ config_json=json.load(args.config_file_path)
 print(config_json)
 platform = config_json["PLATFORM"]
 domain = config_json["DOMAIN"]
-scenario = int(config_json["SCENARIO"])
-##no_trials = int(config_json["NO_TRIALS"])
-version_tag = int(config_json["VERSION_TAG"])
+scenario = config_json["SCENARIO"]
+version_tag = config_json["VERSION_TAG"]
 input_posts_file_location=config_json["INPUT_SEEDS_FILE_PATH"]
-model_identifier=config_json["MODEL_IDENTIFIER"]
+##model_identifier=config_json["MODEL_IDENTIFIER"]
 #########
 
 
 
-print("SOCIALSIM DECEMBER CHALLENGE: SIMULATION")
-print("VERSION: %s" % version_tag)
+print("DARPA SOCIALSIM SIMULATION")
 print("------------ platform: %s. domain: %s. version: %s"%(platform,domain,version_tag))
 
 
@@ -122,7 +116,7 @@ print("------------ platform: %s. domain: %s. version: %s"%(platform,domain,vers
 
 
 ### reset simulation output dirs.
-output_dir="./output/%s/%s/%s/"%(platform,domain,model_identifier)
+output_dir="./output/%s/%s/%s/"%(platform,domain,scenario)
 reset_dir(output_dir)
 print("[reset] output dir: %s"%output_dir)
 
@@ -134,10 +128,17 @@ print("[input posts] Reading..")
 # print("[input posts] Done, # posts: %d"%iposts.shape[0])
 
 
-iposts_array=_get_input_messages(input_posts_file_location)
-##NUMBER_OF_SEED_CHUNKS=len(iposts_array)
-Parallel(n_jobs=NUMBER_OF_SEED_CHUNKS)(delayed(_run)([iposts_array[index],index]) for index in range(NUMBER_OF_SEED_CHUNKS))
+input_messages=_get_input_messages(input_posts_file_location)
+##input_messages=input_messages.sample(100)
+print('Virality, ',input_messages.groupby(['isViral','informationID']).size())
 
+for isViralAtt in input_messages['isViral'].unique():
+    input_messages_=input_messages.query('isViral==@isViralAtt')
+    input_messages_array=np.array_split(input_messages_, NUMBER_OF_SEED_CHUNKS)
+    
+    print('Running for viral cascades? ',isViralAtt)
+    Parallel(n_jobs=NUMBER_OF_SEED_CHUNKS)(delayed(_run)([input_messages_array[index],index,isViralAtt]) for index in range(NUMBER_OF_SEED_CHUNKS))
+    #_run([input_messages_,0,isViralAtt])
 
 end = time.time()
 elapsed=float(end - start)/60
