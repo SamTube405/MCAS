@@ -18,6 +18,8 @@ from os.path import isfile, join
 import glob
 import pickle
 
+import time
+
 import scipy.stats as stats
 from datetime import datetime, timedelta, date
 
@@ -40,6 +42,7 @@ def create_dir(x_dir):
 def reset_dir(x_dir):
     fn=create_dir(x_dir)
 
+start = time.time()    
     
     
 """
@@ -49,8 +52,8 @@ os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID" # so the IDs match nvidia-smi
 os.environ["CUDA_VISIBLE_DEVICES"] = "7" # "0, 1" for multiple
 
 ### List of LSTM layers, where value is the number of hidden memory cells at each layer
-lstm_layers = [[50], [20], [5]]
-epochs=250
+lstm_layers = [[30], [10]]
+epochs=300
 batch_size=16
 loss = 'mse'
 opt='adam'
@@ -104,6 +107,8 @@ info_ids_path = info_ids_path.format(domain)
 model_id_ = config_json['MODEL_PARAMS']
 
 simulation_bool = config_json['SIMULATION']
+
+evaluation_bool = config_json['EVALUATION']
 """
 End of simulation parameters
 """
@@ -153,6 +158,9 @@ local_features_path.extend(target_path)
 local_features=[]
 global_features=[]
 
+local_features_retrain=[]
+global_features_retrain=[]
+
 for feature_path in target_path:
     tags = feature_path.split("/")
     tags = tags[len(tags) - 1].split(".")[0]
@@ -165,16 +173,21 @@ for feature_path in local_features_path:
     if tags in feature_path:
         tmp=pd.read_pickle(feature_path)
         tmp=tmp.sort_index()
+        tmp_val = tmp.loc[:start_sim_period-timedelta(days=1)]
         tmp=tmp.loc[:start_val_period-timedelta(days=1)]
     else:
         tmp=pd.read_pickle(feature_path)
         tmp=tmp.sort_index()
+        tmp_val=tmp.copy()
     local_features.append(tmp)
+    local_features_retrain.append(tmp_val)
 
 for feature_path in global_features_path:
     tmp=pd.read_pickle(feature_path)
     tmp=tmp.sort_index()
+    tmp_val=tmp.copy()
     global_features.append(tmp) 
+    global_features_retrain.append(tmp_val)
 
 ### Load information IDs
 info_ids = pd.read_csv(info_ids_path, header=None)
@@ -183,17 +196,9 @@ info_ids = sorted(list(info_ids['informationID']))
 info_ids = ['informationID_'+x if 'informationID' not in x else x for x in info_ids]
 print(len(info_ids),info_ids)
 
-
-#sim_days = end_sim_period - start_sim_period
-#sim_days = sim_days.days + 1
-
-#if (sim_days % n_out) == 0:
-    
 data_X, data_y = data_prepare_LSTM(start_train_period, end_train_period, target, features_local=local_features,
                                   features_global=global_features, time_in=n_in, time_out=n_out,
                                   narrative_list=info_ids)
-#else:
-#    raise Error('Days to simulate and output window size are not divisible...')
     
 lstm_models = {}
 
@@ -224,6 +229,7 @@ for lstm_layer in lstm_layers:
     lstm_models[model_id]['sim_data'] = narrative_sim
     lstm_models[model_id]['gt_data'] = narrative_gt
     lstm_models[model_id]['performance'] = Gperformance
+    lstm_models[model_id]['layer'] = lstm_layer
     
     print('Finished evaluating, %s'%model_id)
     
@@ -234,11 +240,6 @@ narrative_replay_sim = getReplayBaselinePredictions(window_start_date=start_val_
 
 narrative_sampling_sim = getSamplingBaselinePredictions(window_start_date=start_val_period,
                                                                 window_end_date=end_val_period, target=target, narrative_list=info_ids,)
-
-
-## Evaluation
-# print("Evaluation, %s"%model_id)
-# Gperformance = eval_predictions(model_id=model_id, gt_data=narrative_gt, sim_data=narrative_sim, narrative_list=info_ids)
 
 bmodel_id='Replay'
 print("\n\n\nEvaluation, %s"%bmodel_id)      
@@ -255,34 +256,40 @@ for k, v in lstm_models.items():
     performance_concat.append(v['performance'])
     
 performance_df = pd.concat(performance_concat, ignore_index=True)
-performance_df = pd.merge(performance_df, BSperformance, on='informationID', how='left')
-performance_df['win1'] = 0
-performance_df['win2'] = 0
+# performance_df = pd.merge(performance_df, BSperformance, on='informationID', how='left')
+# performance_df['win1'] = 0
+# performance_df['win2'] = 0
 
-performance_df.loc[performance_df['APE_x']<performance_df['APE_y'], 'win1'] = 1
-performance_df.loc[performance_df['NRMSE_x']<performance_df['NRMSE_y'], 'win2'] = 1
-performance_df['wins'] = performance_df['win1']+performance_df['win2']
+# performance_df.loc[performance_df['APE_x']<performance_df['APE_y'], 'win1'] = 1
+# performance_df.loc[performance_df['NRMSE_x']<performance_df['NRMSE_y'], 'win2'] = 1
+# performance_df['wins'] = performance_df['win1']+performance_df['win2']
 
 ### In case of Tie, save model with lowest avg. RMSE
 #performance_df=performance_df.groupby('MODEL_x').agg({'wins':'sum', 'RMSE_x':'mean'}).reset_index()
 #performance_df=performance_df.sort_values(['wins', 'RMSE_x'], ascending=[False, True]).reset_index(drop=True)
 
 ### Get best model based on lowest RMSE
-performance_df=performance_df.groupby('MODEL_x').agg({'wins':'sum', 'RMSE_x':'median'}).reset_index()
-performance_df=performance_df.sort_values('RMSE_x', ascending=True).reset_index(drop=True)
+# performance_df=performance_df.groupby('MODEL_x').agg({'wins':'sum', 'RMSE_x':'median'}).reset_index()
+# performance_df=performance_df.sort_values('RMSE_x', ascending=True).reset_index(drop=True)
+
+### get best model in terms of heuristic score
+performance_df['XSCORE']=(0.5*(performance_df['APE']/100))+(0.5*(performance_df['NRMSE']/100))
+performance_df = performance_df.groupby(['MODEL']).agg({'XSCORE':'median'}).reset_index()
+performance_df=performance_df.sort_values('XSCORE', ascending=True).reset_index(drop=True)
 
 print("Performance Statistics")
 print(performance_df)
 
-best_model=performance_df.iloc[0]['MODEL_x']
+best_model=performance_df.iloc[0]['MODEL']
 train_model= lstm_models[best_model]['model']
 narrative_gt=lstm_models[best_model]['gt_data']
 narrative_sim=lstm_models[best_model]['sim_data']
 Gperformance=lstm_models[best_model]['performance']
 model_id = best_model
+lstm_layer = lstm_models[best_model]['layer']
 
 
-### Save predictions and performance 
+### Save predictions and performance on validation data 
 output_path = "./ml_output/{0}/{1}/{2}/".format(domain, platform, prediction_type)
 
 #output_dir = "{0}_{1}_{2}_{3}-to-{4}_{5}".format(model_id_, str(start_sim_period.strftime("%Y-%m-%d")), str(end_sim_period.strftime("%Y-%m-%d")), str(n_in), str(n_out), model_id)
@@ -295,57 +302,80 @@ reset_dir(output_path_)
 
 ## Save Results
 Gperformance.to_pickle(output_path_+'Gperformance.pkl.gz')
-pickle.dump(narrative_gt, open(output_path_+'gt_data.pkl.gz', 'wb'))
+pickle.dump(narrative_gt, open(output_path_+'gt_data_validation.pkl.gz', 'wb'))
 pickle.dump(narrative_sim, open(output_path_+'validation_data.pkl.gz', 'wb'))
 
 BRperformance.to_pickle(output_path_+'BRperformance.pkl.gz')
-pickle.dump(narrative_replay_sim, open(output_path_+'replay_simulations_data.pkl.gz', 'wb'))
+pickle.dump(narrative_replay_sim, open(output_path_+'replay_validation_data.pkl.gz', 'wb'))
 
 BSperformance.to_pickle(output_path_+'BSperformance.pkl.gz')
-pickle.dump(narrative_sampling_sim, open(output_path_+'sampling_simulations_data.pkl.gz', 'wb'))
+pickle.dump(narrative_sampling_sim, open(output_path_+'sampling_validation_data.pkl.gz', 'wb'))
 
-train_model.save(output_path_+"best_model.h5")
+### Retrain or fine tune best model
+data_X, data_y = data_prepare_LSTM(start_train_period, end_val_period, target, features_local=local_features_retrain,
+                                  features_global=global_features_retrain, time_in=n_in, time_out=n_out,
+                                  narrative_list=info_ids)
+
+model_lstm = MyLSTM(lstm_layers=lstm_layer, epochs=epochs, batch_size=batch_size, shuffle=shuffle, verbose=verbose,
+                   loss=loss, opt=opt)
+
+train_model = model_lstm.lstm_train(data_X, data_y)
+
+train_model.save(output_path_+"best_retrained_model.h5")
 
 print('Simulation files for {0} stored at'.format(model_id), output_path_)
 
 ### Run Simulations and save data
 if simulation_bool:
     
-    ### load features again based on simulation period
-    local_features=[]
-    global_features=[]
-
-    for feature_path in target_path:
-        tags = feature_path.split("/")
-        tags = tags[len(tags) - 1].split(".")[0]
-
-        tmp=pd.read_pickle(feature_path)
-        tmp=tmp.sort_index()
-        target=tmp.copy()
-
-    for feature_path in local_features_path:
-        if tags in feature_path:
-            tmp=pd.read_pickle(feature_path)
-            tmp=tmp.sort_index()
-            tmp=tmp.loc[:start_sim_period-timedelta(days=1)]
-        else:
-            tmp=pd.read_pickle(feature_path)
-            tmp=tmp.sort_index()
-        local_features.append(tmp)
-
-    for feature_path in global_features_path:
-        tmp=pd.read_pickle(feature_path)
-        tmp=tmp.sort_index()
-        global_features.append(tmp) 
     
     ### Perform simulation with best model based on hyperparameter optimization
     narrative_sim, narrative_gt = run_predictions_LSTM(model_id=model_id, model=train_model, window_start_date=start_sim_period,
                                                                 window_end_date=end_sim_period, target=target, narrative_list=info_ids,
-                                                                features_local=local_features, features_global=global_features,
+                                                                features_local=local_features_retrain,
+                                                       features_global=global_features_retrain,
                                                                 time_in=n_in, time_out=n_out)
     
     ### Save simulation results
     pickle.dump(narrative_sim, open(output_path_+'simulations_data.pkl.gz', 'wb'))
+    
+    ### If we are testing a simulation period, then
+    if evaluation_bool:
+        
+        pickle.dump(narrative_gt, open(output_path_+'gt_data_simulations.pkl.gz', 'wb'))
+        
+        narrative_replay_sim = getReplayBaselinePredictions(window_start_date=start_sim_period,
+                                                                window_end_date=end_sim_period, target=target, narrative_list=info_ids,)
+
+        narrative_sampling_sim = getSamplingBaselinePredictions(window_start_date=start_sim_period,
+                                                                        window_end_date=end_sim_period, target=target,
+                                                                narrative_list=info_ids,)
+
+
+        ## Evaluation
+        print("Evaluation, %s"%model_id)
+        Gperformance = eval_predictions(model_id=model_id, gt_data=narrative_gt, sim_data=narrative_sim, narrative_list=info_ids)
+        
+        Gperformance.to_pickle(output_path_+'Gperformance_simulation.pkl.gz')
+
+        bmodel_id='Replay'
+        print("\n\n\nEvaluation, %s"%bmodel_id)      
+        BRperformance = eval_predictions(model_id=bmodel_id, gt_data=narrative_gt, sim_data=narrative_replay_sim, narrative_list=info_ids)
+
+        bmodel_id='Sampling'
+        print("\n\n\nEvaluation, %s"%bmodel_id)
+        BSperformance = eval_predictions(model_id=bmodel_id, gt_data=narrative_gt, sim_data=narrative_sampling_sim,
+                                         narrative_list=info_ids)
+        
+        BRperformance.to_pickle(output_path_+'BRperformance_simulation.pkl.gz')
+        pickle.dump(narrative_replay_sim, open(output_path_+'replay_simulations_data.pkl.gz', 'wb'))
+
+        BSperformance.to_pickle(output_path_+'BSperformance_simulation.pkl.gz')
+        pickle.dump(narrative_sampling_sim, open(output_path_+'sampling_simulations_data.pkl.gz', 'wb'))
+        
+end = time.time()
+elapsed=float(end - start)/60
+print("Elapsed %0.2f minutes."%elapsed)        
     
     
 
