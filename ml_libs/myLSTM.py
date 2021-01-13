@@ -24,9 +24,9 @@ class MyLSTM:
         
         for i, hidden_neurons in enumerate(self.lstm_layers):
             if i == 0:
-                #model.add(LSTM(hidden_neurons, input_shape=(X.shape[1], X.shape[2]), return_sequences=return_sequences))
-                model.add(LSTM(hidden_neurons, input_shape=(X.shape[1], X.shape[2]), return_sequences=return_sequences,
-                               dropout=0.25))
+                model.add(LSTM(hidden_neurons, input_shape=(X.shape[1], X.shape[2]), return_sequences=return_sequences))
+#                 model.add(LSTM(hidden_neurons, input_shape=(X.shape[1], X.shape[2]), return_sequences=return_sequences,
+#                                dropout=0.25))
             elif i < len(self.lstm_layers)-1:
                 model.add(LSTM(hidden_neurons), return_sequences=return_sequences)
             else:
