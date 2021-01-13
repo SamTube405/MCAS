@@ -76,8 +76,8 @@ for xmodel_name in glob("%s*/"%output_path):
             performance_data.append(Gperformance)
 performance_data=pd.concat(performance_data)
 
-performance_data['XSCORE']=(0.5*(performance_data['APE']/100))+(0.5*(performance_data['NRMSE']/100))
-idx = performance_data.groupby(['informationID'])['XSCORE'].transform(min) == performance_data['XSCORE']
+##performance_data['XSCORE']=(0.5*(performance_data['APE']/100))+(0.5*(performance_data['NRMSE']/100))
+idx = performance_data.groupby(['informationID'])['RMSE'].transform(min) == performance_data['RMSE']
 performance_data_blended=performance_data[idx]
 print("\n\n Blended performance output ---------------")
 print(performance_data_blended)
