@@ -21,16 +21,17 @@ class SimX:
         self.scenario=args[2]
         self.pa=args[3]
        
-        self.pool=ThreadPool(8)
+        self.pool=ThreadPool(64)
         self.sim_outputs=[]
         self.output_location="./output/%s/%s/%s"% (self.platform,self.domain,self.scenario)
         
     def set_metadata(self):
-        print("[Degree by level] loading..")  
-        if self.pa:
-            self.data_level_degree_list=pd.read_pickle("./metadata/probs/%s-%s-%s/cascade_props_inf_degree.pkl.gz"%(self.platform,self.domain,self.scenario))
-        else:
-            self.data_level_degree_list=pd.read_pickle("./metadata/probs/%s-%s-%s/cascade_props_degree.pkl.gz"%(self.platform,self.domain,self.scenario))
+        print("[Degree by level] loading..")
+        self.data_level_degree_list=pd.read_pickle("./metadata/probs/%s/%s/%s/cascade_props_prob_degree.pkl.gz"%(self.platform,self.domain,self.scenario))
+#         if self.pa:
+#             self.data_level_degree_list=pd.read_pickle("./metadata/probs/%s-%s-%s/cascade_props_inf_prob_degree.pkl.gz"%(self.platform,self.domain,self.scenario))
+#         else:
+#             self.data_level_degree_list=pd.read_pickle("./metadata/probs/%s-%s-%s/cascade_props_degree.pkl.gz"%(self.platform,self.domain,self.scenario))
         
 #         print("[Delay sequences by size] loading..")
 #         self.data_delay_level_degree_root_list=pd.read_pickle("./metadata/probs/%s-%s/delay_cond_size.pkl.gz"%(self.platform,self.domain))
@@ -38,7 +39,7 @@ class SimX:
         
     def set_user_metadata(self):#,user_list,user_followers):
         print("[User probability] loading..")
-        self.data_user_list=pd.read_pickle("./metadata/probs/%s-%s-%s/user_diffusion.pkl.gz"%(self.platform,self.domain,self.scenario))
+        self.data_user_list=pd.read_pickle("./metadata/probs/%s/%s/%s/user_diffusion.pkl.gz"%(self.platform,self.domain,self.scenario))
         self.data_user_ego=self.data_user_list.groupby("parentUserID").size().reset_index(name="num_neighbors")
         self.data_user_ego.set_index("parentUserID",inplace=True)
         
@@ -150,11 +151,12 @@ class SimX:
 #         return [self._get_random_id() for i in range(size)]
     
     def write_output(self,output,version):
-        output_loc="%s/cascade_v%s.json"% (self.output_location,version)
-        output_file = open(output_loc, 'w', encoding='utf-8')
-        output_records=output.to_dict('records')        
-        for d in output_records:
-            output_file.write(json.dumps(d) + '\n')
+        output_loc="%s/cascade_v%s.pkl.gz"% (self.output_location,version)
+        output.to_pickle(output_loc)
+#         output_file = open(output_loc, 'w', encoding='utf-8')
+#         output_records=output.to_dict('records')        
+#         for d in output_records:
+#             output_file.write(json.dumps(d) + '\n')
     
         
     def _get_degree(self,level):
@@ -305,7 +307,7 @@ class SimX:
         
         ipost_id=ipost['nodeID']
         ipost_user=None#ipost['nodeUserID']
-        ipost_degree=None
+        ipost_degree=ipost['iDegree']##None
         ipost_created_date=str(ipost['nodeTime'])
         ipost_infoID=ipost['informationID']
                     
@@ -370,6 +372,7 @@ class SimX:
         
         
         sim_output=pd.concat(self.sim_outputs)
+        sim_output['platform']=self.platform
         
         no_cascades=len(self.sim_outputs)
         no_acts=sim_output.shape[0]

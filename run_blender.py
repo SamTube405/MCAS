@@ -58,7 +58,7 @@ sim_data={}
 val_data={}
 for xmodel_name in glob("%s*/"%output_path):
     xmodel_name_array=xmodel_name.split("/")[-2].split("_")
-    #print(xmodel_names_array)
+    print(xmodel_name_array)
     if len(xmodel_name_array)>3:
         if (xmodel_name_array[1]==start_sim_period) & (xmodel_name_array[2]==end_sim_period):
             print("Into the blender: ",xmodel_name)

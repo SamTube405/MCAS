@@ -63,8 +63,19 @@ def reset_dir(x_dir):
 def _get_input_messages(path):
     input_messages=pd.read_csv(path,header=None)
     input_messages.columns=['nodeTime','nodeID','nodeUserID','isViral','informationID']
+    
     infoIDs=input_messages['informationID'].unique()
     print("Presence: ",infoIDs.shape[0],infoIDs)
+    
+    input_messages_array=[]
+    for infoID in infoIDs:
+        input_messages_=input_messages.query('informationID==@infoID')
+        input_messages_['iDegree']=np.random.choice(a=degreeList, size=input_messages_.shape[0],p=degreeProbList)
+        input_messages_array.append(input_messages_)
+    input_messages=pd.concat(input_messages_array)
+    
+
+    
     return input_messages
 
 
@@ -127,18 +138,26 @@ print("[input posts] Reading..")
 # iposts=_get_input_posts(input_posts_file_location)
 # print("[input posts] Done, # posts: %d"%iposts.shape[0])
 
+cascade_props_prob_degree=pd.read_pickle("./metadata/probs/%s/%s/%s/cascade_props_prob_degree.pkl.gz"%(platform,domain,scenario))
+degreeList=np.array(cascade_props_prob_degree.loc[0]['udegreeV'])
+degreeProbList=np.array(cascade_props_prob_degree.loc[0]["probV"])
 
 input_messages=_get_input_messages(input_posts_file_location)
-##input_messages=input_messages.sample(100)
-print('Virality, ',input_messages.groupby(['isViral','informationID']).size())
+input_messages=input_messages.query('isViral==False')
+input_messages_array=np.array_split(input_messages, NUMBER_OF_SEED_CHUNKS)
 
-for isViralAtt in input_messages['isViral'].unique():
-    input_messages_=input_messages.query('isViral==@isViralAtt')
-    input_messages_array=np.array_split(input_messages_, NUMBER_OF_SEED_CHUNKS)
-    
-    print('Running for viral cascades? ',isViralAtt)
-    Parallel(n_jobs=NUMBER_OF_SEED_CHUNKS)(delayed(_run)([input_messages_array[index],index,isViralAtt]) for index in range(NUMBER_OF_SEED_CHUNKS))
-    #_run([input_messages_,0,isViralAtt])
+##input_messages=input_messages.sample(100)
+##print('Virality, ',input_messages.groupby(['isViral','informationID']).size())
+
+#for isViralAtt in [False]:
+
+
+
+
+##print('Running for viral cascades? ',isViralAtt)
+##NUMBER_OF_SEED_CHUNKS=len(input_messages_array)
+Parallel(n_jobs=NUMBER_OF_SEED_CHUNKS)(delayed(_run)([input_messages_array[index],index,False]) for index in range(NUMBER_OF_SEED_CHUNKS))
+#_run([input_messages_,0,isViralAtt])
 
 end = time.time()
 elapsed=float(end - start)/60

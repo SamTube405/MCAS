@@ -1,8 +1,10 @@
 import os
 import pandas as pd
 import numpy as np
+import argparse
+import json
 from treelib import Node, Tree, tree
-from lib_job_thread import *
+from libs.lib_job_thread import *
 
 def create_dir(x_dir):
     if not os.path.exists(x_dir):
@@ -33,7 +35,7 @@ class Cascade(object):
         self.platform=platform
         self.domain=domain
         self.scenario=scenario
-        self.output_dir="./metadata/probs/%s-%s-%s"%(self.platform,self.domain,self.scenario)
+        self.output_dir="./metadata/probs/%s/%s/%s"%(self.platform,self.domain,self.scenario)
         create_dir(self.output_dir)
         
         self.pool = ThreadPool(128) 
@@ -263,16 +265,21 @@ class Cascade(object):
             row['probV']=degree_df["probability"].values
 
             return row
+        
+        cascade_props_degree0=self.cascade_props.groupby("level")["degree"].apply(list).reset_index(name="degreeV")
+        cascade_props_degree0=cascade_props_degree0.apply(_get_prob_vector,axis=1)
+        cascade_props_degree0.set_index('level',inplace=True)
+        cascade_props_degree0.to_pickle("%s/cascade_props_prob_degree.pkl.gz"%(self.output_dir))
 
         cascade_props_degree1=self.cascade_props.query('inf_rootID==True').groupby("level")["degree"].apply(list).reset_index(name="degreeV")
         cascade_props_degree1=cascade_props_degree1.apply(_get_prob_vector,axis=1)
         cascade_props_degree1.set_index('level',inplace=True)
-        cascade_props_degree1.to_pickle("%s/cascade_props_inf_degree.pkl.gz"%(self.output_dir))
+        cascade_props_degree1.to_pickle("%s/cascade_props_inf_prob_degree.pkl.gz"%(self.output_dir))
         
         cascade_props_degree2=self.cascade_props.query('inf_rootID==False').groupby("level")["degree"].apply(list).reset_index(name="degreeV")
         cascade_props_degree2=cascade_props_degree2.apply(_get_prob_vector,axis=1)
         cascade_props_degree2.set_index('level',inplace=True)
-        cascade_props_degree2.to_pickle("%s/cascade_props_non_inf_degree.pkl.gz"%(self.output_dir))
+        cascade_props_degree2.to_pickle("%s/cascade_props_non_inf_prob_degree.pkl.gz"%(self.output_dir))
         return cascade_props_degree1,cascade_props_degree2
     
     def get_cascade_delays(self):
@@ -283,11 +290,18 @@ class Cascade(object):
         return cascade_props_delay
 
 
-#cpath='/data/DevHub/recur-cascades/WWW2021/cpec_resources/cascade_records_0105_0106.pkl.gz'
-cpath='/data/DevHub/recur-cascades/WWW2021/cpec_resources/cascade_records_0106_0107.pkl.gz'
-#cpath='/data/DevHub/recur-cascades/WWW2021/cpec_resources/cascade_records_XhYAfMuJfDEBxtk_YuRV4A.pkl.gz'
+parser = argparse.ArgumentParser(description='Simulation Parameters')
+parser.add_argument('--config', dest='config_file_path', type=argparse.FileType('r'))
+args = parser.parse_args()
 
-cas=Cascade("twitter","cpec","coldrun",cpath)
+config_json=json.load(args.config_file_path)
+platform = config_json['PLATFORM']
+domain = config_json['DOMAIN']
+scenario = config_json["SCENARIO"]
+input_data_path = config_json["INPUT_CASCADES_FILE_PATH"]
+
+
+cas=Cascade(platform,domain,scenario,input_data_path)
 cas.prepare_data()
 
 user_spread_info=cas.get_user_spread_info()

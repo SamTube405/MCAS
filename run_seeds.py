@@ -38,8 +38,8 @@ config_json=json.load(args.config_file_path)
 # version = config_json['VERSION_TAG']
 domain = config_json['DOMAIN']
 platform = config_json['PLATFORM']
-start_sim_period = config_json['start_sim_period']
-end_sim_period = config_json['end_sim_period']
+start_sim_period = config_json['START_SIM_PERIOD']
+end_sim_period = config_json['END_SIM_PERIOD']
 sim_start_date=datetime.strptime(start_sim_period,"%Y-%m-%d")
 sim_end_date=datetime.strptime(end_sim_period,"%Y-%m-%d")
 oneD=timedelta(days=1)
@@ -74,10 +74,11 @@ if os.path.exists(filePath):
     print("Existing file deleted.")
 fd=open(filePath,'a')
 
+# print(sim_data_seed)
 global_event_count=0
 for info_id in info_ids:
     
-    
+
     ######
     index=0
     seed_viral=False
@@ -86,10 +87,11 @@ for info_id in info_ids:
         sim_day_text=sim_day.strftime("%Y-%m-%d")
         seed_count=int(seed_data[index])
         print("Day: %s, InfoID: %s, # seeds: %d"%(sim_day_text,info_id, seed_count))
-        if seed_count<=0:
-            continue
         global_event_count+=seed_count
         index+=1
+        
+#         if seed_count<=0:
+#             continue
 
         for seed_index in range(seed_count):
             seed_identifier = "seed_%16x"%random.getrandbits(64)
