@@ -1,3 +1,5 @@
 metadata/*
 output/*
 */__pycache__/*
+ml_input/*
+ml_output/*

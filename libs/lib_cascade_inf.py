@@ -19,19 +19,24 @@ class SimX:
         self.platform=args[0]
         self.domain=args[1]
         self.scenario=args[2]
-        self.pa=args[3]
+        self.infoID=args[3]
+        self.infoID_label=self.infoID.replace("/","_")
+        
+        if self.platform=="twitter":
+            self.seed_label='tweet'
+            self.response_label='retweet'
+        elif self.platform=="youtube":
+            self.seed_label='video'
+            self.response_label='comment'
        
         self.pool=ThreadPool(64)
         self.sim_outputs=[]
         self.output_location="./output/%s/%s/%s"% (self.platform,self.domain,self.scenario)
+        print("[reset] output dir: %s"%self.output_location)
         
     def set_metadata(self):
         print("[Degree by level] loading..")
-        self.data_level_degree_list=pd.read_pickle("./metadata/probs/%s/%s/%s/cascade_props_prob_degree.pkl.gz"%(self.platform,self.domain,self.scenario))
-#         if self.pa:
-#             self.data_level_degree_list=pd.read_pickle("./metadata/probs/%s-%s-%s/cascade_props_inf_prob_degree.pkl.gz"%(self.platform,self.domain,self.scenario))
-#         else:
-#             self.data_level_degree_list=pd.read_pickle("./metadata/probs/%s-%s-%s/cascade_props_degree.pkl.gz"%(self.platform,self.domain,self.scenario))
+        self.data_level_degree_list=pd.read_pickle("./metadata/probs/%s/%s/%s/%s/cascade_props_prob_degree.pkl.gz"%(self.platform,self.domain,self.scenario,self.infoID_label))
         
 #         print("[Delay sequences by size] loading..")
 #         self.data_delay_level_degree_root_list=pd.read_pickle("./metadata/probs/%s-%s/delay_cond_size.pkl.gz"%(self.platform,self.domain))
@@ -39,7 +44,7 @@ class SimX:
         
     def set_user_metadata(self):#,user_list,user_followers):
         print("[User probability] loading..")
-        self.data_user_list=pd.read_pickle("./metadata/probs/%s/%s/%s/user_diffusion.pkl.gz"%(self.platform,self.domain,self.scenario))
+        self.data_user_list=pd.read_pickle("./metadata/probs/%s/%s/%s/%s/user_diffusion.pkl.gz"%(self.platform,self.domain,self.scenario,self.infoID_label))
         self.data_user_ego=self.data_user_list.groupby("parentUserID").size().reset_index(name="num_neighbors")
         self.data_user_ego.set_index("parentUserID",inplace=True)
         
@@ -109,7 +114,7 @@ class SimX:
             hop_neighbors=hop_neighbors.query('num_neighbors>@degree')
             #print("# satisfied neighbor diffusions: %d, reqd %d children"%(hop_neighbors.shape[0],degree))
             if hop_neighbors.shape[0]>0:
-                random_user_id=hop_neighbors.sample(n=1,weights="num_neighbors",replace=False).index[0]
+                random_user_id=hop_neighbors.sample(n=1,weights="num_neighbors",replace=True).index[0]
                 #print('Ego biased hop user assigned, id: %s, degree: %d'%(random_user_id,degree))
             else:
                 random_user_id=self._get_activity_biased_user_id()
@@ -294,8 +299,8 @@ class SimX:
         ##print(cascade_tree.shape[0])
         cascade_tree["rootID"]=pid
         cascade_tree["rootUserID"]=puser_id
-        cascade_tree["actionType"]="retweet"  #'retweet
-        cascade_tree.loc[:0,"actionType"] ="tweet"
+        cascade_tree["actionType"]=self.response_label
+        cascade_tree.loc[:0,"actionType"] =self.seed_label
 
         ## attach the delays
         ctree_size=cascade_tree.shape[0]
@@ -348,7 +353,7 @@ class SimX:
         
         ipost_user=ipost_tree.iloc[0]['rootUserID']
         
-        print("[simulation] infoID: %s, post id: %s, viral: %r, author: %s, timestamp: %s, cascade size: %d"%(ipost_infoID,ipost_id,self.pa,ipost_user,ipost_created_date,ipost_tree.shape[0]))
+        print("[simulation] infoID: %s, post id: %s, author: %s, timestamp: %s, cascade size: %d"%(ipost_infoID,ipost_id,ipost_user,ipost_created_date,ipost_tree.shape[0]))
 
 #         ## assign communityID
 #         ipost_tree["communityID"]=ipost_subreddit
