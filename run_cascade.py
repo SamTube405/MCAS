@@ -74,19 +74,14 @@ def _get_input_messages(path):
         ipath=path.format(platform,domain,scenario,infoID_label)
         try:
             input_messages=pd.read_csv(ipath,header=None)
-            input_messages.columns=['nodeTime','nodeID','nodeUserID','informationID']
+            input_messages.columns=['nodeTime','nodeID','nodeUserID','iDegree','informationID']
         except pd.errors.EmptyDataError:
             continue
         
     
         if input_messages.shape[0]>0:
             print(infoID,input_messages.shape[0])
-            cascade_props_prob_degree=pd.read_pickle("./metadata/probs/%s/%s/%s/%s/cascade_props_prob_degree.pkl.gz"%(platform,domain,scenario,infoID_label))
-            degreeList=np.array(cascade_props_prob_degree.loc[0]['udegreeV'])
-            degreeProbList=np.array(cascade_props_prob_degree.loc[0]["probV"])
-
             input_messages_=input_messages.query('informationID==@infoID')
-            input_messages_['iDegree']=np.random.choice(a=degreeList, size=input_messages_.shape[0],p=degreeProbList)
             input_messages_.reset_index(inplace=True)
             prevj=0;
             nextj=0
