@@ -106,6 +106,38 @@ class SimX:
             
         return random_user_id
     
+    def _prioritize_neighbor_user_ids(self,neighbor_ids):
+        listed_neighbor_ids=neighbor_ids
+        hop_neighbors=self.data_user_ego[self.data_user_ego.index.isin(neighbor_ids)]
+        if hop_neighbors.shape[0]>0:
+            hop_neighbors.sort_values(by="num_neighbors",ascending=False)
+            listed_neighbor_ids=set(hop_neighbors.index)
+            
+            missed_neighbor_ids=set(neighbor_ids)-listed_neighbor_ids
+            act_neighbors=self.data_acts_list[self.data_acts_list.index.isin(missed_neighbor_ids)]
+            act_neighbors.sort_values(by="num_acts",ascending=False)
+            listed_neighbor_ids_=set(act_neighbors.index)
+            missed_neighbor_ids_=set(missed_neighbor_ids)-listed_neighbor_ids_
+            listed_neighbor_ids_=list(listed_neighbor_ids_)
+            listed_neighbor_ids_.append(list(missed_neighbor_ids_))
+            
+            listed_neighbor_ids=list(listed_neighbor_ids)
+            listed_neighbor_ids.extend(listed_neighbor_ids_)
+        else:
+            ##print(neighbor_ids)
+            act_neighbors=self.data_acts_list[self.data_acts_list.index.isin(neighbor_ids)]
+            act_neighbors.sort_values(by="num_acts",ascending=False)
+            
+            if act_neighbors.shape[0]>0:
+                listed_neighbor_ids=set(act_neighbors.index)
+                missed_neighbor_ids=set(neighbor_ids)-listed_neighbor_ids
+                
+                listed_neighbor_ids=list(listed_neighbor_ids)
+                listed_neighbor_ids.append(list(missed_neighbor_ids))
+    
+        return listed_neighbor_ids
+        
+    
     def _get_neighbor_user_ids(self,user_id,degree):
         try:
             neighbors=self.data_user_list.loc[[user_id]]
@@ -117,8 +149,6 @@ class SimX:
                 neighbor_user_ids=list(neighbors['nodeUserID'])
                 random_user_ids=list(self.data_acts_list.sample(n=degree-neighbors.shape[0],weights="num_acts").index)
                 neighbor_user_ids.extend(random_user_ids)
-#             else:
-#                 neighbor_user_ids=list(self.data_acts_list.sample(n=degree,weights="num_acts").index)
 
                 
         except KeyError as ke:
@@ -126,55 +156,7 @@ class SimX:
             
         return neighbor_user_ids
     
-#     def _get_ego_hop_biased_user_id(self,user_id,degree):
-#         try:
-#             neighbor_ids=list(self.data_user_list.loc[user_id]['nodeUserID'])
-#             #print(neighbor_ids)
-#             hop_neighbors=self.data_user_ego[self.data_user_ego.index.isin(neighbor_ids)]
-#             #print("# neighbor diffusions: %d, reqd %d children"%(hop_neighbors.shape[0],degree))
-#             hop_neighbors=hop_neighbors.query('num_neighbors>@degree')
-#             #print("# satisfied neighbor diffusions: %d, reqd %d children"%(hop_neighbors.shape[0],degree))
-#             if hop_neighbors.shape[0]>0:
-#                 random_user_id=hop_neighbors.sample(n=1,weights="num_neighbors").index[0]
-#                 #print('Ego biased hop user assigned, id: %s, degree: %d'%(random_user_id,degree))
-#             else:
-#                 random_user_id=self._get_activity_biased_user_id()
-#         except KeyError as ke:
-#             random_user_id=self._get_activity_biased_user_id()
-            
-#         return random_user_id
-    
-#     def _get_neighbor_user_id(self,user_id):
-#         try:
-#             ###random_user_id=self.data_user_list.loc[user_id].sample(n=1,weights="prob",replace=True).iloc[0]["source_author"]
-#             ##print(self.data_user_list[self.data_user_list['target_author']==user_id])
-#             neighbors=self.data_user_list.loc[user_id]#self.data_user_list[self.data_user_list['pnodeUserID']==user_id]
-#             if neighbors.shape[0]>0:
-#                 random_user_id=neighbors.sample(n=1,weights="prob",replace=True).iloc[0]["nodeUserID"]
-#             else:
-#                 random_user_id=self._get_random_user_id()
-#         except:
-#             random_user_id=self._get_random_user_id()
-#         return random_user_id
-    
-#     def _get_neighbor_user_id_vector(self,user_id,num_neighbors):
-#         #try:
-#         neighbors=self.data_user_list.loc[user_id]
-#         print("# neighbors %d, reqd %d"%(neighbors.shape[0],num_neighbors))
-#         if neighbors.shape[0]>=num_neighbors:
-#             neighbor_user_ids=list(neighbors.sample(n=num_neighbors,weights="prob",replace=False)["nodeUserID"])
-#         else:
-#             neighbor_user_ids=list(neighbors.iloc[0:neighbors.shape[0]]["nodeUserID"])
-#             num_extra_neighbors=num_neighbors-neighbors.shape[0]
-#             random_user_ids=[self._get_activity_biased_user_id() for _ in range(num_extra_neighbors)]
-#             neighbor_user_ids.extend(random_user_ids)
-# #         except:
-# #             print('Warning, no neighbors detected for this user id, %s'%user_id)
-# #             neighbor_user_ids=[self._get_activity_biased_user_id() for _ in range(num_neighbors)]
-#         return neighbor_user_ids
 
-#     def _get_random_users(self,size):
-#         return [self._get_random_id() for i in range(size)]
     
     def write_output(self,output,version):
         output_loc="%s/cascade_v%s.pkl.gz"% (self.output_location,version)
@@ -201,27 +183,23 @@ class SimX:
             sampled_degree = np.random.choice(a=degreeList, p=degreeProbList)
         return sampled_degree
     
-#     def _get_initial_degree(self,level):
-#         sampled_degree=0
-#         ulevels=set(self.data_level_degree_list.index.get_level_values('level'))
-#         flag=False;
-#         while not flag:
-#             flag=(level in ulevels)
-#             if(flag==False):
-#                 level-=1
+    def _get_degree_vector(self,level,num_children):
+        sampled_degrees=np.zeros(num_children)
+        ulevels=set(self.data_level_degree_list.index.get_level_values('level'))
+        flag=False;
+        while not flag:
+            flag=(level in ulevels)
+            if(flag==False):
+                level-=1
           
-#         degreeList=np.array(self.data_level_degree_list.loc[level]['udegreeV'])
-#         degreeProbList=np.array(self.data_level_degree_list.loc[level]["probV"])
-# #         if pa:
-# #             degreeProbList=1/degreeProbList
-# #             degreeProbList=degreeProbList/np.sum(degreeProbList)
-#         ##print(level,degreeList,degreeProbList)
-#         if len(degreeList)>0:
-#             sampled_degree = np.random.choice(a=degreeList, p=degreeProbList)
-#             sampled_degree_index=np.where(degreeList==sampled_degree)[0][0]
-#             print(sampled_degree_index)
-#             sampled_degree_percentile=int(self.initial_degreeV_percentiles[sampled_degree_index])
-#         return sampled_degree,sampled_degree_percentile
+        degreeList=np.array(self.data_level_degree_list.loc[level]['udegreeV'])
+        degreeProbList=np.array(self.data_level_degree_list.loc[level]["probV"])
+
+        if len(degreeList)>0:
+            ## sort desc. order
+            sampled_degrees = -np.sort(-np.random.choice(size=num_children,a=degreeList, p=degreeProbList))
+
+        return sampled_degrees
     
 
 #     def _get_delayV(self,size):
@@ -274,6 +252,8 @@ class SimX:
         num_children=pdegree
 
         nuser_ids=self._get_neighbor_user_ids(puser_id,num_children)
+        nuser_ids=self._prioritize_neighbor_user_ids(nuser_ids)
+        ndegrees=self._get_degree_vector(level,num_children)
         
         index=0
         while(index<num_children):
@@ -283,7 +263,7 @@ class SimX:
             ###nuser_id=self._get_random_id()
             #nuser_id=nuser_ids[index]
   
-            ndegree=self._get_degree(level)
+            ndegree=ndegrees[index]#self._get_degree(level)
             nuser_id=nuser_ids[index]
             ##nuser_id=self._get_ego_hop_biased_user_id(puser_id,ndegree)
             
@@ -338,18 +318,6 @@ class SimX:
         ipost_created_date=str(ipost['nodeTime'])
         ipost_infoID=ipost['informationID']
                     
-        #### head changed, influentials assigned
-#         ipost_degree, ipost_degree_percentile=self._get_initial_degree(0)
-#         inf_user_index = int(np.percentile(self.inf_user_probs, ipost_degree_percentile))
-#         print("Inf",inf_user_index)
-#         ipost_user=self.inf_user_keys[inf_user_index]
-
-        
-        ##ipost_subreddit=ipost['subreddit_id']
-
-        ##print("started: ",start)
-        ##print("[simulation] post id: %s, author: %s, timestamp: %s"%(ipost_id,ipost_user,ipost_created_date))
-
         ipost_tree=self._gen_cascade_tree(ipost_id,ipost_user,ipost_degree)
 
         # assign times
@@ -358,13 +326,6 @@ class SimX:
 #         ipost_tree["nodeTime"]+=ipost_tree["long_propagation_delay"]
         
         ipost_tree["informationID"]=ipost_infoID
-
-#         # assign authors
-#         ipost_tree_size=ipost_tree.shape[0]
-#         ## random users
-#         ipost_tree["nodeUserID"]=self._get_random_users(ipost_tree_size)
-#         ## fix the poster
-#         ipost_tree.loc[:0,"nodeUserID"]=ipost_user
 
 
         icols=["nodeID","nodeUserID","parentID", "parentUserID", "rootID", "rootUserID", "actionType", "nodeTime","informationID"]
