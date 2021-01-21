@@ -84,7 +84,7 @@ class SimX:
     
     def _get_activity_biased_user_id(self):
         #try:
-        random_user_id=self.data_acts_list.sample(n=1,weights="num_acts",replace=True).index[0]
+        random_user_id=self.data_acts_list.sample(n=1,weights="num_acts").index[0]
         #print('Activity biased user assigned, id: %s'%(random_user_id))
 #         except KeyError as ke:
 #             random_user_id=self._get_random_user_id()
@@ -95,6 +95,7 @@ class SimX:
     def _get_ego_biased_user_id(self,degree):
         #try:
         hops=self.data_user_ego.query('num_neighbors>@degree')
+        hops["num_neighbors"]=hops["num_neighbors"]/hops["num_neighbors"].sum()
         if hops.shape[0]>0:
             random_user_id=hops.sample(n=1,weights="num_neighbors").index[0]
             #print('Ego biased seed user assigned, id: %s, degree: %d'%(random_user_id,degree))
@@ -105,23 +106,43 @@ class SimX:
             
         return random_user_id
     
-    def _get_ego_hop_biased_user_id(self,user_id,degree):
+    def _get_neighbor_user_ids(self,user_id,degree):
         try:
-            neighbor_ids=list(self.data_user_list.loc[user_id]['nodeUserID'])
-            #print(neighbor_ids)
-            hop_neighbors=self.data_user_ego[self.data_user_ego.index.isin(neighbor_ids)]
-            #print("# neighbor diffusions: %d, reqd %d children"%(hop_neighbors.shape[0],degree))
-            hop_neighbors=hop_neighbors.query('num_neighbors>@degree')
-            #print("# satisfied neighbor diffusions: %d, reqd %d children"%(hop_neighbors.shape[0],degree))
-            if hop_neighbors.shape[0]>0:
-                random_user_id=hop_neighbors.sample(n=1,weights="num_neighbors",replace=True).index[0]
-                #print('Ego biased hop user assigned, id: %s, degree: %d'%(random_user_id,degree))
+            neighbors=self.data_user_list.loc[[user_id]]
+
+            num_neighbors=neighbors.shape[0]
+            if num_neighbors>degree:
+                neighbor_user_ids=list(neighbors.sample(n=degree,weights="prob")['nodeUserID'])
             else:
-                random_user_id=self._get_activity_biased_user_id()
+                neighbor_user_ids=list(neighbors['nodeUserID'])
+                random_user_ids=list(self.data_acts_list.sample(n=degree-neighbors.shape[0],weights="num_acts").index)
+                neighbor_user_ids.extend(random_user_ids)
+#             else:
+#                 neighbor_user_ids=list(self.data_acts_list.sample(n=degree,weights="num_acts").index)
+
+                
         except KeyError as ke:
-            random_user_id=self._get_activity_biased_user_id()
+            neighbor_user_ids=list(self.data_acts_list.sample(n=degree,weights="num_acts").index)
             
-        return random_user_id
+        return neighbor_user_ids
+    
+#     def _get_ego_hop_biased_user_id(self,user_id,degree):
+#         try:
+#             neighbor_ids=list(self.data_user_list.loc[user_id]['nodeUserID'])
+#             #print(neighbor_ids)
+#             hop_neighbors=self.data_user_ego[self.data_user_ego.index.isin(neighbor_ids)]
+#             #print("# neighbor diffusions: %d, reqd %d children"%(hop_neighbors.shape[0],degree))
+#             hop_neighbors=hop_neighbors.query('num_neighbors>@degree')
+#             #print("# satisfied neighbor diffusions: %d, reqd %d children"%(hop_neighbors.shape[0],degree))
+#             if hop_neighbors.shape[0]>0:
+#                 random_user_id=hop_neighbors.sample(n=1,weights="num_neighbors").index[0]
+#                 #print('Ego biased hop user assigned, id: %s, degree: %d'%(random_user_id,degree))
+#             else:
+#                 random_user_id=self._get_activity_biased_user_id()
+#         except KeyError as ke:
+#             random_user_id=self._get_activity_biased_user_id()
+            
+#         return random_user_id
     
 #     def _get_neighbor_user_id(self,user_id):
 #         try:
@@ -252,7 +273,7 @@ class SimX:
         puser_id=nlist[4]
         num_children=pdegree
 
-        #nuser_ids=self._get_neighbor_user_id_vector(puser_id,num_children)
+        nuser_ids=self._get_neighbor_user_ids(puser_id,num_children)
         
         index=0
         while(index<num_children):
@@ -263,7 +284,8 @@ class SimX:
             #nuser_id=nuser_ids[index]
   
             ndegree=self._get_degree(level)
-            nuser_id=self._get_ego_hop_biased_user_id(puser_id,ndegree)
+            nuser_id=nuser_ids[index]
+            ##nuser_id=self._get_ego_hop_biased_user_id(puser_id,ndegree)
             
             klist=[level,ndegree,mid,pid,nuser_id,puser_id]
 

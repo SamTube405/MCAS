@@ -73,18 +73,19 @@ blend_output_path_seed = "/data/CP5_MCAS/MCAS/ml_output/{0}_{1}/{2}/seed/BLEND_{
 blend_output_path_response = "/data/CP5_MCAS/MCAS/ml_output/{0}_{1}/{2}/response/BLEND_{3}_{4}".format(domain, scenario, platform, start_sim_period,end_sim_period)
 
 print("[Seed counts] loading..")
-with open(blend_output_path_seed+'/simulations_data.pkl.gz', 'rb') as fd:
+with open(blend_output_path_seed+'/gt_data_simulations.pkl.gz', 'rb') as fd:#simulations_data.pkl.gz
     sim_data_seed=pickle.load(fd)
 
 print("[Response counts] loading..")
-with open(blend_output_path_response+'/simulations_data.pkl.gz', 'rb') as fd:
+with open(blend_output_path_response+'/gt_data_simulations.pkl.gz', 'rb') as fd:#simulations_data.pkl.gz
     sim_data_response=pickle.load(fd)
 
 
 
 # print(sim_data_seed)
 global_event_count=0
-pred_event_count=0
+global_seed_count=0
+global_ml_count=0
 for info_id in info_ids:
     infoID_label=info_id.replace("/","_")
     blend_output_path_seed_cascade = "./metadata/probs/{0}/{1}/{2}/{3}".format(platform, domain,scenario,infoID_label)
@@ -103,44 +104,74 @@ for info_id in info_ids:
     index=0
     seed_data=sim_data_seed[info_id]
     response_data=sim_data_response[info_id]
+    local_seed_count=0
+    local_response_count=0
+    local_event_count=0
+    local_ml_count=0
     for sim_day in daterange(sim_start_date, sim_end_date+oneD):
         sim_day_text=sim_day.strftime("%Y-%m-%d")
         seed_count=int(seed_data[index])
         response_count=int(response_data[index])
-        response_count=int(response_count*iNode0)
-        index+=1
+        
+        
         
         ##print("Day: %s, InfoID: %s, # seeds: %d, # responses: %d"%(sim_day_text,info_id, seed_count, response_count))
-        print("Day: %s, InfoID: %s, # responses: %d"%(sim_day_text,info_id, response_count))
-#         global_event_count+=seed_count
-#         global_event_count+=response_count
+        #cascade_child_count=seed_count+response_count
+        local_ml_count+=seed_count+response_count
+        index+=1
+        
 
-#         cascade_seeds_count=seed_count
-#         cascade_responses_count=response_count
+        isViral=False
+        if (seed_count>0) & (response_count>0):
+            isViral=((response_count/seed_count)>18)
+            if isViral:
+                degreeList_=degreeList[2:]
+                degreeProbList_=degreeProbList[2:]
+                degreeProbList_=degreeProbList_/np.sum(degreeProbList_)
+        print("Day: %s, InfoID: %s, # messages: %d, isViral: %r"%(sim_day_text,info_id, seed_count+response_count, isViral))
+            
+        response_count=int(response_count*iNode0)
         
-        cascade_child_count=seed_count+response_count
+        cascade_child_count_dict={}
+        for j in range(10):
+            cascade_child_count=seed_count+response_count
+            cascade_child_count_array=[]
+            while (cascade_child_count>0): 
+                sampled_degree = np.random.choice(a=degreeList, p=degreeProbList)
+                cascade_child_count-=(sampled_degree+1)
+                cascade_child_count_array.append(sampled_degree)
+            cascade_child_count_dict.setdefault(cascade_child_count,cascade_child_count_array)
+            
+            
+        cascade_child_count_max=max(list(cascade_child_count_dict.keys()))
+        cascade_child_count_array=cascade_child_count_dict[cascade_child_count_max]
         
-        while (cascade_child_count>0): #(cascade_seeds_count>0) | 
-            ##cascade_seeds_count-=1
-            cascade_child_count-=1
-            global_event_count+=1
+        for sampled_degree in cascade_child_count_array:
             seed_identifier = "seed_%16x"%random.getrandbits(64)
             seed_user_id=None
-            
-            sampled_degree = np.random.choice(a=degreeList, p=degreeProbList)
-            while sampled_degree>cascade_child_count:
-                sampled_degree = np.random.choice(a=degreeList, p=degreeProbList)
-            cascade_child_count-=sampled_degree 
-            global_event_count+=sampled_degree
+            local_seed_count+=1
+            local_event_count+=1
 
+            local_response_count+=sampled_degree 
+            local_event_count+=sampled_degree
                     
-            
             fd.write("%s,%s,%s,%d,%s\n"%(sim_day_text,seed_identifier,seed_user_id,sampled_degree,info_id))  
-        print(cascade_child_count)#cascade_seeds_count,
+            
+    global_event_count+=local_event_count
+    global_ml_count+=local_ml_count
+    global_seed_count+=local_seed_count
+        
+        
+    print("Expected: ",int(local_event_count/iNode0)," ML predicted: ",local_ml_count)#cascade_seeds_count,
+    print("# Seeds: ",local_seed_count)
+    print("# responses ",local_response_count," required: ",local_event_count-local_seed_count)
+        
         
     print("Saved seeds at %s"%filePath)
-    
-print("Total # Events: ",global_event_count)
+
+print("Total # Seeds: ",global_seed_count)
+print("Total # Events (Reduced by Level 0 child nodes): ",global_event_count)
+print("Total # ML Events: ",global_ml_count)
 
    
 

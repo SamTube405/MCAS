@@ -176,7 +176,10 @@ print("# seeds block array: ",block_sum,block_count)
 # # Parallel(n_jobs=NUMBER_OF_SEED_CHUNKS)(delayed(_run)([input_messages_array[index],index,False]) for index in range(NUMBER_OF_SEED_CHUNKS))
 # NUMBER_OF_SEED_CHUNKS=len(info_ids)
 Parallel(n_jobs=block_count)(delayed(_run)([k,v]) for k,v in input_messages_dict.items())
-# #_run([input_messages_,0,isViralAtt])
+# for k,v in input_messages_dict.items():
+#     _run([k,v])
+#     break;
+    
 
 end = time.time()
 elapsed=float(end - start)/60
