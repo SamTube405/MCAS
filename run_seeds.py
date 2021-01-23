@@ -52,6 +52,7 @@ config_json=json.load(args.config_file_path)
 domain = config_json['DOMAIN']
 platform = config_json['PLATFORM']
 scenario = config_json["SCENARIO"]
+model_identifier = config_json["MODEL_IDENTIFIER"]
 start_sim_period = config_json['START_SIM_PERIOD']
 end_sim_period = config_json['END_SIM_PERIOD']
 sim_start_date=datetime.strptime(start_sim_period,"%Y-%m-%d")
@@ -68,16 +69,28 @@ info_ids = sorted(list(info_ids['informationID']))
 info_ids = ['informationID_'+x if 'informationID' not in x else x for x in info_ids]
 print(len(info_ids),info_ids)
 
-#output_path = "./ml_output/{0}/{1}/{2}/".format(domain, platform, prediction_type)
-blend_output_path_seed = "/data/CP5_MCAS/MCAS/ml_output/{0}_{1}/{2}/seed/BLEND_{3}_{4}".format(domain, scenario, platform, start_sim_period,end_sim_period)
-blend_output_path_response = "/data/CP5_MCAS/MCAS/ml_output/{0}_{1}/{2}/response/BLEND_{3}_{4}".format(domain, scenario, platform, start_sim_period,end_sim_period)
+# ### GT Test
+# blend_output_path_seed = "/data/CP5_MCAS/MCAS/ml_output/{0}_{1}/{2}/seed/BLEND_{3}_{4}".format(domain, scenario, platform, start_sim_period,end_sim_period)
+# blend_output_path_response = "/data/CP5_MCAS/MCAS/ml_output/{0}_{1}/{2}/response/BLEND_{3}_{4}".format(domain, scenario, platform, start_sim_period,end_sim_period)
+
+# print("[Seed counts] loading..")
+# with open(blend_output_path_seed+'/gt_data_simulations.pkl.gz', 'rb') as fd:#simulations_data.pkl.gz
+#     sim_data_seed=pickle.load(fd)
+
+# print("[Response counts] loading..")
+# with open(blend_output_path_response+'/gt_data_simulations.pkl.gz', 'rb') as fd:#simulations_data.pkl.gz
+#     sim_data_response=pickle.load(fd)
+    
+
+blend_output_path_seed = "/data/CP5_MCAS/MCAS/ml_output/{0}_{1}/{2}/seed/{3}_{4}_{5}".format(domain, scenario, platform, model_identifier,start_sim_period,end_sim_period)
+blend_output_path_response = "/data/CP5_MCAS/MCAS/ml_output/{0}_{1}/{2}/response/{3}_{4}_{5}".format(domain, scenario, platform,model_identifier,start_sim_period,end_sim_period)
 
 print("[Seed counts] loading..")
-with open(blend_output_path_seed+'/gt_data_simulations.pkl.gz', 'rb') as fd:#simulations_data.pkl.gz
+with open(blend_output_path_seed+'/simulations_data.pkl.gz', 'rb') as fd:
     sim_data_seed=pickle.load(fd)
 
 print("[Response counts] loading..")
-with open(blend_output_path_response+'/gt_data_simulations.pkl.gz', 'rb') as fd:#simulations_data.pkl.gz
+with open(blend_output_path_response+'/simulations_data.pkl.gz', 'rb') as fd:
     sim_data_response=pickle.load(fd)
 
 
@@ -90,7 +103,7 @@ for info_id in info_ids:
     infoID_label=info_id.replace("/","_")
     blend_output_path_seed_cascade = "./metadata/probs/{0}/{1}/{2}/{3}".format(platform, domain,scenario,infoID_label)
     reset_dir(blend_output_path_seed_cascade)
-    filePath="%s/input_seeds_responses.csv"%blend_output_path_seed_cascade  
+    filePath="%s/test_input_seeds_responses_%s.csv"%(blend_output_path_seed_cascade,model_identifier) 
     if os.path.exists(filePath):
         os.remove(filePath)
         print("Existing file deleted.")

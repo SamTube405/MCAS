@@ -71,7 +71,7 @@ def _get_input_messages(path):
         infoID_label=infoID.replace("/","_")
         
         
-        ipath=path.format(platform,domain,scenario,infoID_label)
+        ipath=path.format(platform,domain,scenario,infoID_label,model_identifier)
         try:
             input_messages=pd.read_csv(ipath,header=None)
             input_messages.columns=['nodeTime','nodeID','nodeUserID','iDegree','informationID']
@@ -112,7 +112,7 @@ def _run(args):
     print("[started][job] %s, # seeds: %d"%(version,iposts_records.shape[0]))
     iposts_records=iposts_records.to_dict(orient='records')
     
-    simX=SimX(platform,domain,scenario,iposts_infoid)
+    simX=SimX(platform,domain,scenario,model_identifier,iposts_infoid)
     simX.set_metadata()
     simX.set_user_metadata()
     
@@ -134,6 +134,7 @@ print(config_json)
 platform = config_json["PLATFORM"]
 domain = config_json["DOMAIN"]
 scenario = config_json["SCENARIO"]
+model_identifier = config_json["MODEL_IDENTIFIER"]
 version_tag = config_json["VERSION_TAG"]
 input_posts_file_location=config_json["INPUT_SEEDS_FILE_PATH"]
 info_ids_path = config_json['INFORMATION_IDS']
@@ -157,7 +158,7 @@ print("------------ platform: %s. domain: %s. scenario: %s. version: %s"%(platfo
 
 
 ### reset simulation output dirs.
-output_dir="./output/%s/%s/%s/"%(platform,domain,scenario)
+output_dir="./output/%s/%s/%s/%s/"%(platform,domain,scenario,model_identifier)
 reset_dir(output_dir)
 print("[reset] output dir: %s"%output_dir)
 
@@ -177,8 +178,9 @@ print("# seeds block array: ",block_sum,block_count)
 # NUMBER_OF_SEED_CHUNKS=len(info_ids)
 Parallel(n_jobs=block_count)(delayed(_run)([k,v]) for k,v in input_messages_dict.items())
 # for k,v in input_messages_dict.items():
-#     _run([k,v])
-#     break;
+#     if k == "informationID_other_block_25":
+#         _run([k,v])
+    ##break;
     
 
 end = time.time()

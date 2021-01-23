@@ -13,13 +13,17 @@ from scipy import stats
 from libs.lib_job_thread import *
 
 import logging
+import warnings
+from pandas.core.common import SettingWithCopyWarning
+warnings.simplefilter(action="ignore", category=SettingWithCopyWarning)
 
 class SimX:
     def __init__(self,*args):
         self.platform=args[0]
         self.domain=args[1]
         self.scenario=args[2]
-        self.infoID=args[3]
+        self.model_identifier=args[3]
+        self.infoID=args[4]
         self.infoID_label=self.infoID.replace("/","_")
         
         if self.platform=="twitter":
@@ -31,7 +35,7 @@ class SimX:
        
         self.pool=ThreadPool(64)
         self.sim_outputs=[]
-        self.output_location="./output/%s/%s/%s"% (self.platform,self.domain,self.scenario)
+        self.output_location="./output/%s/%s/%s/%s"% (self.platform,self.domain,self.scenario,self.model_identifier)
         print("[reset] output dir: %s"%self.output_location)
         
     def set_metadata(self):
@@ -78,9 +82,9 @@ class SimX:
         hash = random.getrandbits(64)
         return "%16x"%hash
     
-    def _get_random_user_id(self):
-        hash = random.getrandbits(64)
-        return "gen_%16x"%hash
+#     def _get_random_user_id(self):
+#         hash = random.getrandbits(64)
+#         return "gen_%16x"%hash
     
     def _get_activity_biased_user_id(self):
         #try:
@@ -95,7 +99,6 @@ class SimX:
     def _get_ego_biased_user_id(self,degree):
         #try:
         hops=self.data_user_ego.query('num_neighbors>@degree')
-        hops["num_neighbors"]=hops["num_neighbors"]/hops["num_neighbors"].sum()
         if hops.shape[0]>0:
             random_user_id=hops.sample(n=1,weights="num_neighbors").index[0]
             #print('Ego biased seed user assigned, id: %s, degree: %d'%(random_user_id,degree))
@@ -114,15 +117,19 @@ class SimX:
             listed_neighbor_ids=set(hop_neighbors.index)
             
             missed_neighbor_ids=set(neighbor_ids)-listed_neighbor_ids
-            act_neighbors=self.data_acts_list[self.data_acts_list.index.isin(missed_neighbor_ids)]
-            act_neighbors.sort_values(by="num_acts",ascending=False)
-            listed_neighbor_ids_=set(act_neighbors.index)
-            missed_neighbor_ids_=set(missed_neighbor_ids)-listed_neighbor_ids_
-            listed_neighbor_ids_=list(listed_neighbor_ids_)
-            listed_neighbor_ids_.append(list(missed_neighbor_ids_))
-            
             listed_neighbor_ids=list(listed_neighbor_ids)
-            listed_neighbor_ids.extend(listed_neighbor_ids_)
+            if len(missed_neighbor_ids)>0:
+                act_neighbors=self.data_acts_list[self.data_acts_list.index.isin(missed_neighbor_ids)]
+                act_neighbors.sort_values(by="num_acts",ascending=False)
+                listed_neighbor_ids_=set(act_neighbors.index)
+                missed_neighbor_ids_=set(missed_neighbor_ids)-listed_neighbor_ids_
+                listed_neighbor_ids_=list(listed_neighbor_ids_)
+                missed_neighbor_ids_=list(missed_neighbor_ids_)
+                
+                if len(missed_neighbor_ids_)>0:
+                    listed_neighbor_ids_.extend(missed_neighbor_ids_)
+            
+                listed_neighbor_ids.extend(listed_neighbor_ids_)
         else:
             ##print(neighbor_ids)
             act_neighbors=self.data_acts_list[self.data_acts_list.index.isin(neighbor_ids)]
@@ -131,10 +138,12 @@ class SimX:
             if act_neighbors.shape[0]>0:
                 listed_neighbor_ids=set(act_neighbors.index)
                 missed_neighbor_ids=set(neighbor_ids)-listed_neighbor_ids
-                
                 listed_neighbor_ids=list(listed_neighbor_ids)
-                listed_neighbor_ids.append(list(missed_neighbor_ids))
+                missed_neighbor_ids=list(missed_neighbor_ids)
+                if len(missed_neighbor_ids)>0:
+                    listed_neighbor_ids.extend(missed_neighbor_ids)
     
+        assert(len(neighbor_ids)==len(listed_neighbor_ids))
         return listed_neighbor_ids
         
     
@@ -147,13 +156,15 @@ class SimX:
                 neighbor_user_ids=list(neighbors.sample(n=degree,weights="prob")['nodeUserID'])
             else:
                 neighbor_user_ids=list(neighbors['nodeUserID'])
-                random_user_ids=list(self.data_acts_list.sample(n=degree-neighbors.shape[0],weights="num_acts").index)
+                neighbor_user_ids_pool=self.data_acts_list[self.data_acts_list.index.isin(neighbor_user_ids)==False]
+                random_user_ids=list(neighbor_user_ids_pool.sample(n=degree-neighbors.shape[0],weights="num_acts").index)
                 neighbor_user_ids.extend(random_user_ids)
 
                 
         except KeyError as ke:
             neighbor_user_ids=list(self.data_acts_list.sample(n=degree,weights="num_acts").index)
-            
+         
+        assert(degree==len(neighbor_user_ids))
         return neighbor_user_ids
     
 
@@ -199,6 +210,7 @@ class SimX:
             ## sort desc. order
             sampled_degrees = -np.sort(-np.random.choice(size=num_children,a=degreeList, p=degreeProbList))
 
+        assert(num_children==len(sampled_degrees))
         return sampled_degrees
     
 
@@ -252,8 +264,12 @@ class SimX:
         num_children=pdegree
 
         nuser_ids=self._get_neighbor_user_ids(puser_id,num_children)
-        nuser_ids=self._prioritize_neighbor_user_ids(nuser_ids)
+        assert(num_children==len(set(nuser_ids)))
         ndegrees=self._get_degree_vector(level,num_children)
+        
+        if num_children>1:
+            nuser_ids=self._prioritize_neighbor_user_ids(nuser_ids)
+
         
         index=0
         while(index<num_children):
