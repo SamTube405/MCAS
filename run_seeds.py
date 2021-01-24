@@ -38,6 +38,17 @@ def get_inode(props):
     #print(iNodes0)
     return iNodes0
 
+# def get_virality(seed_count,response_count):
+#     if platform=="twitter":
+#         isViral=False
+#         if (seed_count>0) & (response_count>0):
+#             isViral=((response_count/seed_count)>18)
+#         elif (seed_count==0) & (response_count>0):
+#             isViral=True
+#     elif platform=="youtube":
+#         isViral=True
+#     return isViral
+
 """
 Load the simulation parameters
 """
@@ -86,11 +97,11 @@ blend_output_path_seed = "/data/CP5_MCAS/MCAS/ml_output/{0}_{1}/{2}/seed/{3}_{4}
 blend_output_path_response = "/data/CP5_MCAS/MCAS/ml_output/{0}_{1}/{2}/response/{3}_{4}_{5}".format(domain, scenario, platform,model_identifier,start_sim_period,end_sim_period)
 
 print("[Seed counts] loading..")
-with open(blend_output_path_seed+'/simulations_data.pkl.gz', 'rb') as fd:
+with open(blend_output_path_seed+'/simulations_data.pkl.gz', 'rb') as fd:#gt_data_simulations.pkl.gz
     sim_data_seed=pickle.load(fd)
 
 print("[Response counts] loading..")
-with open(blend_output_path_response+'/simulations_data.pkl.gz', 'rb') as fd:
+with open(blend_output_path_response+'/simulations_data.pkl.gz', 'rb') as fd:#gt_data_simulations.pkl.gz
     sim_data_response=pickle.load(fd)
 
 
@@ -103,7 +114,7 @@ for info_id in info_ids:
     infoID_label=info_id.replace("/","_")
     blend_output_path_seed_cascade = "./metadata/probs/{0}/{1}/{2}/{3}".format(platform, domain,scenario,infoID_label)
     reset_dir(blend_output_path_seed_cascade)
-    filePath="%s/test_input_seeds_responses_%s.csv"%(blend_output_path_seed_cascade,model_identifier) 
+    filePath="%s/input_seeds_responses_%s.csv"%(blend_output_path_seed_cascade,model_identifier) 
     if os.path.exists(filePath):
         os.remove(filePath)
         print("Existing file deleted.")
@@ -117,6 +128,13 @@ for info_id in info_ids:
     index=0
     seed_data=sim_data_seed[info_id]
     response_data=sim_data_response[info_id]
+    
+#     total_seed_count=sum(seed_data)
+#     total_response_count=sum(response_data)
+#     if total_seed_count>0:
+#         seed_avg_responses=int(total_response_count/total_seed_count)
+#         print(seed_avg_responses)
+    
     local_seed_count=0
     local_response_count=0
     local_event_count=0
@@ -125,8 +143,7 @@ for info_id in info_ids:
         sim_day_text=sim_day.strftime("%Y-%m-%d")
         seed_count=int(seed_data[index])
         response_count=int(response_data[index])
-        
-        
+       
         
         ##print("Day: %s, InfoID: %s, # seeds: %d, # responses: %d"%(sim_day_text,info_id, seed_count, response_count))
         #cascade_child_count=seed_count+response_count
@@ -134,14 +151,20 @@ for info_id in info_ids:
         index+=1
         
 
-        isViral=False
-        if (seed_count>0) & (response_count>0):
-            isViral=((response_count/seed_count)>18)
-            if isViral:
-                degreeList_=degreeList[2:]
-                degreeProbList_=degreeProbList[2:]
-                degreeProbList_=degreeProbList_/np.sum(degreeProbList_)
-        print("Day: %s, InfoID: %s, # messages: %d, isViral: %r"%(sim_day_text,info_id, seed_count+response_count, isViral))
+#         isViral=get_virality(seed_count,response_count)
+
+            
+#         if isViral:
+#             k=min(2,len(degreeList)-1)
+#             degreeList_=degreeList[k:]
+#             degreeProbList_=degreeProbList[k:]
+#             degreeProbList_=degreeProbList_/np.sum(degreeProbList_)
+#             ##print(degreeList_,degreeProbList_)
+#         else:
+#             degreeList_=degreeList
+#             degreeProbList_=degreeProbList
+            
+        print("Day: %s, InfoID: %s, # messages: %d (%0.2f)"%(sim_day_text,info_id, seed_count+response_count,iNode0))
             
         response_count=int(response_count*iNode0)
         
