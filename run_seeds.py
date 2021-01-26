@@ -38,17 +38,6 @@ def get_inode(props):
     #print(iNodes0)
     return iNodes0
 
-# def get_virality(seed_count,response_count):
-#     if platform=="twitter":
-#         isViral=False
-#         if (seed_count>0) & (response_count>0):
-#             isViral=((response_count/seed_count)>18)
-#         elif (seed_count==0) & (response_count>0):
-#             isViral=True
-#     elif platform=="youtube":
-#         isViral=True
-#     return isViral
-
 """
 Load the simulation parameters
 """
@@ -129,12 +118,6 @@ for info_id in info_ids:
     seed_data=sim_data_seed[info_id]
     response_data=sim_data_response[info_id]
     
-#     total_seed_count=sum(seed_data)
-#     total_response_count=sum(response_data)
-#     if total_seed_count>0:
-#         seed_avg_responses=int(total_response_count/total_seed_count)
-#         print(seed_avg_responses)
-    
     local_seed_count=0
     local_response_count=0
     local_event_count=0
@@ -143,44 +126,31 @@ for info_id in info_ids:
         sim_day_text=sim_day.strftime("%Y-%m-%d")
         seed_count=int(seed_data[index])
         response_count=int(response_data[index])
-       
-        
-        ##print("Day: %s, InfoID: %s, # seeds: %d, # responses: %d"%(sim_day_text,info_id, seed_count, response_count))
-        #cascade_child_count=seed_count+response_count
+
         local_ml_count+=seed_count+response_count
         index+=1
-        
-
-#         isViral=get_virality(seed_count,response_count)
 
             
-#         if isViral:
-#             k=min(2,len(degreeList)-1)
-#             degreeList_=degreeList[k:]
-#             degreeProbList_=degreeProbList[k:]
-#             degreeProbList_=degreeProbList_/np.sum(degreeProbList_)
-#             ##print(degreeList_,degreeProbList_)
-#         else:
-#             degreeList_=degreeList
-#             degreeProbList_=degreeProbList
+        print("Day: %s, InfoID: %s, # messages: %d"%(sim_day_text,info_id, seed_count+response_count))
             
-        print("Day: %s, InfoID: %s, # messages: %d (%0.2f)"%(sim_day_text,info_id, seed_count+response_count,iNode0))
-            
-        response_count=int(response_count*iNode0)
-        
+        day_ml_count=int((seed_count+response_count)*iNode0)
         cascade_child_count_dict={}
         for j in range(10):
-            cascade_child_count=seed_count+response_count
+            cascade_child_count=day_ml_count
+            ##print(cascade_child_count)
             cascade_child_count_array=[]
             while (cascade_child_count>0): 
                 sampled_degree = np.random.choice(a=degreeList, p=degreeProbList)
                 cascade_child_count-=(sampled_degree+1)
                 cascade_child_count_array.append(sampled_degree)
+            ##print("--",cascade_child_count)
             cascade_child_count_dict.setdefault(cascade_child_count,cascade_child_count_array)
             
             
         cascade_child_count_max=max(list(cascade_child_count_dict.keys()))
         cascade_child_count_array=cascade_child_count_dict[cascade_child_count_max]
+        ##print("Error (lower worst): ",cascade_child_count_max," # Events ",sum(cascade_child_count_array)+len(cascade_child_count_array)," matching ",seed_count+response_count)
+        assert(abs(cascade_child_count_max)==abs((sum(cascade_child_count_array)+len(cascade_child_count_array))-day_ml_count))
         
         for sampled_degree in cascade_child_count_array:
             seed_identifier = "seed_%16x"%random.getrandbits(64)
@@ -198,12 +168,10 @@ for info_id in info_ids:
     global_seed_count+=local_seed_count
         
         
-    print("Expected: ",int(local_event_count/iNode0)," ML predicted: ",local_ml_count)#cascade_seeds_count,
-    print("# Seeds: ",local_seed_count)
-    print("# responses ",local_response_count," required: ",local_event_count-local_seed_count)
+    print("# Seeds: ",local_seed_count," Expected: ",int(local_event_count/iNode0)," ML predicted: ",local_ml_count)
         
         
-    print("Saved seeds at %s"%filePath)
+    print("Saved seeds at %s\n"%filePath)
 
 print("Total # Seeds: ",global_seed_count)
 print("Total # Events (Reduced by Level 0 child nodes): ",global_event_count)

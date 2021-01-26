@@ -86,15 +86,15 @@ class SimX:
 #         hash = random.getrandbits(64)
 #         return "gen_%16x"%hash
     
-    def _get_activity_biased_user_id(self):
-        #try:
-        random_user_id=self.data_acts_list.sample(n=1,weights="num_acts").index[0]
-        #print('Activity biased user assigned, id: %s'%(random_user_id))
-#         except KeyError as ke:
-#             random_user_id=self._get_random_user_id()
-            ##print("new user: ",random_user_id)
+#     def _get_activity_biased_user_id(self):
+#         #try:
+#         random_user_id=self.data_acts_list.sample(n=1,weights="num_acts").index[0]
+#         #print('Activity biased user assigned, id: %s'%(random_user_id))
+# #         except KeyError as ke:
+# #             random_user_id=self._get_random_user_id()
+#             ##print("new user: ",random_user_id)
             
-        return random_user_id
+#         return random_user_id
     
     def _get_ego_biased_user_id(self,degree):
         #try:
@@ -103,7 +103,7 @@ class SimX:
             random_user_id=hops.sample(n=1,weights="num_neighbors").index[0]
             #print('Ego biased seed user assigned, id: %s, degree: %d'%(random_user_id,degree))
         else:
-            random_user_id=self._get_activity_biased_user_id()
+            random_user_id=self.data_user_ego.sample(n=1,weights="num_neighbors").index[0]
         #except KeyError as ke:
             
             
