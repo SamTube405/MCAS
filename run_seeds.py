@@ -133,7 +133,9 @@ for info_id in info_ids:
             
         print("Day: %s, InfoID: %s, # messages: %d"%(sim_day_text,info_id, seed_count+response_count))
             
-        day_ml_count=int((seed_count+response_count)*iNode0)
+        day_ml_count=int(response_count*iNode0)
+        day_ml_count+=seed_count
+        ###day_ml_count=int((seed_count+response_count)*iNode0)
         cascade_child_count_dict={}
         for j in range(10):
             cascade_child_count=day_ml_count
