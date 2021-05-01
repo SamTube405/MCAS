@@ -1,0 +1,23 @@
+{
+"VERSION_TAG":"v2",
+"DOMAIN":"cpec",
+"PLATFORM":"twitter",
+"PREDICTION_TYPE":"seed",
+"start_train_period":"2020-03-30",
+"end_train_period":"2020-06-01",
+"start_sim_period":"2020-06-02",
+"end_sim_period":"2020-06-29",
+"time_window":
+    {
+    "n_in":28,
+    "n_out":28
+    },
+"FEATURES_PATH":
+    {
+    "GLOBAL":"./ml_input/{0}/{1}/global/",
+    "LOCAL":"./ml_input/{0}/{1}/local/",
+    "TARGET":"./ml_input/{0}/{1}/target/{2}/"
+    },
+"INFORMATION_IDS":"./ml_input/{0}/{0}_infoids.txt",
+"MODEL_PARAMS":"LSTM"
+}
