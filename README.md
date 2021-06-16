@@ -57,4 +57,7 @@ ml_output
 Available ML models: ['RandomForestRegressor','ExtraTreesRegressor','BaggingRegressor', 'GradientBoostingRegressor', 'AdaBoostRegressor', 'GaussianProcessRegressor', 'IsotonicRegression', 'ARDRegression', 'HuberRegressor', 'LinearRegression', 'LogisticRegression', 'LogisticRegressionCV', 'PassiveAggressiveRegressor', 'SGDRegressor', 'TheilSenRegressor', 'RANSACRegressor', 'KNeighborsRegressor', 'RadiusNeighborsRegressor', 'MLPRegressor', 'DecisionTreeRegressor', 'ExtraTreeRegressor']
 
 The script can test different models at once if multiple models are defined in the config files along with their corresponding parameters for optimization.
+
+## Acknowledgments
+This work is supported by the DARPA SocialSim Program and the Air Force Research Laboratory under contract FA8650-18-C-7825.
  
