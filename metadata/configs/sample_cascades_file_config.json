@@ -1,0 +1,18 @@
+{
+"VERSION_TAG": "1",
+"PLATFORM": "platform_name",
+"DOMAIN": "domain_name",
+"SCENARIO": "domain_name",
+"MODEL_IDENTIFIER": [    
+"MCAS-BLENDED-EXOG", 
+"MCAS-BLENDED-INTERNAL", 
+"MCAS-ENSEMBLE", 
+"MCAS-META-ENSEMBLE"
+],
+"INFORMATION_IDS": "./metadata/configs/infoids_{0}.txt",
+"START_SIM_PERIOD": "2020-11-09",
+"END_SIM_PERIOD": "2020-11-29",
+"TRAINING_DATA_X_MUL_SIM": 2,
+"NUM_SIM_TRIALS": 1,
+"INPUT_CASCADES_FILE_PATH": ""
+}
