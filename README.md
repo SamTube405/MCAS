@@ -58,6 +58,17 @@ ml_output
 - DAILY: boolean (if true, then predictions/features are in daily granularity else it assumes weekly granularity)
 - MODEL_TYPE: either local_topics (we have features per topic) or global_topics (we only have global features available)
 
+## How to Run
+1. Run volume predictor scripts
+    1. python run_predictions_lstm.py --config ./metadata/configs/sample_volume_predictor_config.json
+2. Generate MCAS Models (See Notebook at examples/Generate_MCAS_Models.ipynb)
+3. Run Cascades (Modify configuration files correspondingly)
+    1. python run_cascade_props.py --config metadata/configs/sample_cascades_file_config.json
+    2. python run_cascade.py --config metadata/configs/sample_cascades_file_config.json
+4. Merge cascade outputs (See Notebook at examples/Generate_Cascade_Outputs.ipynb)
+5. Run new user scripts (Modify parameters within the code correspondingly)
+    1. python run_newuser_replace_script.py
+
 ## Acknowledgments
 This work is supported by the DARPA SocialSim Program and the Air Force Research Laboratory under contract FA8650-18-C-7825.
  
