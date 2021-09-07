@@ -1,0 +1,32 @@
+{
+    "VERSION_TAG": "Source-Name",
+    "DOMAIN": "domain_name",
+    "PLATFORM": "platform_name",
+    "PREDICTION_TYPE": "total_shares",
+    "start_train_period": "2020-02-01",
+    "end_train_period": "2020-10-18",
+    "start_val_period": "2020-10-19",
+    "end_val_period": "2020-11-08",
+    "start_sim_period": "2020-11-09",
+    "end_sim_period": "2020-11-29",
+    "time_window": {
+        "n_in": 3,
+        "n_out": 1
+    },
+    "FEATURES_PATH": {
+        "GLOBAL": [
+            "./ml_input/{0}/{1}/global/sample_global_features.pkl.gz"
+        ],
+        "LOCAL": [
+            "./ml_input/{0}/{1}/local/sample_local_features.pkl.gz"
+        ],
+        "TARGET": "./ml_input/{0}/{1}/target/{2}/"
+    },
+    "INFORMATION_IDS": "./ml_input/{0}/infoids_{1}_{2}.txt",
+    "MODEL_PARAMS": "LSTM",
+    "SIMULATION": true,
+    "EVALUATION": false,
+    "DAILY": true,
+    "MODEL_TYPE": "local_topics",
+    "PREV_DOMAIN": ""
+}
