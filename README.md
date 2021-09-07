@@ -9,54 +9,54 @@ python run_predictions.py --config ./metadata/configs/seed_predictions.json
 ## Directory Hierarchy:
 
 ```bash
-ml_input
-└── cpec
-    ├── cpec_infoids.txt
-    └── twitter
+ml_input/
+└── domain_name
+    ├── infoids_platform_name_local_topics.txt
+    └── platform_name
         ├── global
+        │   └── sample_global_features.pkl.gz
         ├── local
-        │   ├── news_counts_overtime_day.pkl.gz
-        │   └── reddit_counts_overtime_day.pkl.gz
+        │   └── sample_local_features.pkl.gz
         └── target
-            ├── activated_user
-            ├── response
-            └── seed
-                └── cpec_tw_seeds_overtime_day.pkl.gz
+            └── total_shares
+                └── sample_target_total_shares.pkl.gz
+
 ```
 
 ```bash
 ml_output
-└── cpec
-    └── twitter
-        └── seed
-            └── MLPRegressor_2020-06-16_2020-06-29_v1_prev_day
-                ├── best_hyper_parameters.pkl.gz
-                ├── best_model.h5
-                ├── Gperformance.pkl.gz
-                ├── gt_data.pkl.gz
-                └── simulations_data.pkl.gz
+└── domain_name
+    └── platform_name
+        └──local_topics/global_topics
+            └── total_shares
+                └── LSTM_{start sim period}_{end sim period}_{input/output time horizon}_{source name}
+                    ├── best_retrained_model.h5.h5
+                    ├── Gperformance_simulation.pkl.gz
+                    ├── gt_data_simulations.pkl.gz
+                    └── simulations_data.pkl.gz
 ```
 
 ## Config File Parameters
 - VERSION_TAG: unique file name for the simulation output file.
 - DOMAIN: (e.g., wh, vz, cpec)
-- PLATFORM: sm platform to predict
-- PREDICTION_TYPE: either seed, response, activated_user
+- PLATFORM: sm platform to predict (e.g., twitter, youtube)
+- PREDICTION_TYPE: (e.g., total shares, new users, old users)
 - start_train_period: start date for training data
 - end_train_period: end date for training data
+- start_val_period: start date for validation data
+- end_val_period: end date for validation data
 - start_sim_period: start date for simulation
 - end_sim_period: end date for simulation
-- time_lag: for previous day (days:1 and hours:0). Currently tested for previous day only.
+- time_window -> n_in: input time horizon
+- time_window -> n_out: output time horizon
 - FEATURES_PATH: 
-  + GLOBAL: path to global features (not per infoID). It can accept list of paths instead.
-  + LOCAL: path to per infoID features. Can accept list of paths instead.
-  + TARGET: path to dataframe consisting of target variable
-- INFORMATION_IDS: path to information IDs
-- MODEL_PARAMS: dictionary of ML model keys and parameters values. Note if parameter includes a list of tuples, it must be converted to list of lists
-
-Available ML models: ['RandomForestRegressor','ExtraTreesRegressor','BaggingRegressor', 'GradientBoostingRegressor', 'AdaBoostRegressor', 'GaussianProcessRegressor', 'IsotonicRegression', 'ARDRegression', 'HuberRegressor', 'LinearRegression', 'LogisticRegression', 'LogisticRegressionCV', 'PassiveAggressiveRegressor', 'SGDRegressor', 'TheilSenRegressor', 'RANSACRegressor', 'KNeighborsRegressor', 'RadiusNeighborsRegressor', 'MLPRegressor', 'DecisionTreeRegressor', 'ExtraTreeRegressor']
-
-The script can test different models at once if multiple models are defined in the config files along with their corresponding parameters for optimization.
+  + GLOBAL: path to global features (not per infoID). It can accept list of paths.
+  + LOCAL: path to features per infoID. Can accept list of paths.
+  + TARGET: path to dataframe consisting of target variable(s)
+- INFORMATION_IDS: path to information IDs to predict
+- EVALUATION: boolean (if true it assumes we have GT data to evaluate against, else false).
+- DAILY: boolean (if true, then predictions/features are in daily granularity else it assumes weekly granularity)
+- MODEL_TYPE: either local_topics (we have features per topic) or global_topics (we only have global features available)
 
 ## Acknowledgments
 This work is supported by the DARPA SocialSim Program and the Air Force Research Laboratory under contract FA8650-18-C-7825.
