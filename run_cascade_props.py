@@ -4,7 +4,24 @@ import numpy as np
 import argparse
 import json
 from treelib import Node, Tree, tree
+from datetime import datetime, timedelta, date
+def daterange(start_date, end_date):
+    for n in range(int ((end_date - start_date).days)):
+        yield start_date + timedelta(n)
+
+def datespan(startDate, endDate, delta=timedelta(days=7)):
+    currentDate = startDate
+    while currentDate < endDate:
+        yield currentDate
+        currentDate += delta
+        
 from libs.lib_job_thread import *
+from joblib import Parallel, delayed
+import string 
+import random
+letters = list(string.ascii_lowercase)
+def rand(stri):
+    return random.choice(letters)
 
 def create_dir(x_dir):
     if not os.path.exists(x_dir):
@@ -51,32 +68,78 @@ class Cascade(object):
 
         
     def prepare_data(self):
-        node_users=self.cascade_records[['nodeID','nodeUserID','nodeTime']].drop_duplicates()
+        node_users=self.cascade_records[['nodeID','nodeTime']].drop_duplicates().dropna()
         
-        node_users.columns=['rootID','rootUserID','rootTime']
-        self.cascade_records=pd.merge(self.cascade_records,node_users,on='rootID',how='left')
-        self.cascade_records.loc[self.cascade_records['rootUserID'].isna()==True,'rootUserID']=self.cascade_records['nodeUserID']
-        self.cascade_records.loc[self.cascade_records['rootTime'].isna()==True,'rootTime']=self.cascade_records['nodeTime']
-        
-        
-        node_users.columns=['parentID','parentUserID','parentTime']
+        node_users.columns=['parentID','parentTime']
         self.cascade_records=pd.merge(self.cascade_records,node_users,on='parentID',how='left')
+        self.cascade_records.loc[self.cascade_records['parentID'].isna()==True,'parentID']=self.cascade_records['nodeID']
         self.cascade_records.loc[self.cascade_records['parentUserID'].isna()==True,'parentUserID']=self.cascade_records['nodeUserID']
-        self.cascade_records.loc[self.cascade_records['parentID'].isna()==True,'parentID']=self.cascade_records['nodeTime']
+        self.cascade_records.loc[self.cascade_records['parentTime'].isna()==True,'parentTime']=self.cascade_records['nodeTime']
+
+        node_users.columns=['rootID','rootTime']
+        self.cascade_records=pd.merge(self.cascade_records,node_users,on='rootID',how='left')
+        self.cascade_records.loc[self.cascade_records['rootID'].isna()==True,'rootID']=self.cascade_records['parentID']
+        
+        self.cascade_records.loc[self.cascade_records['rootUserID'].isna()==True,'rootUserID']=self.cascade_records['parentUserID']
+        self.cascade_records.loc[self.cascade_records['rootTime'].isna()==True,'rootTime']=self.cascade_records['parentTime']
+        
+        
+        
         
         self.cascade_records["short_propagation_delay"]=self.cascade_records['nodeTime']-self.cascade_records['parentTime']
         self.cascade_records["long_propagation_delay"]=self.cascade_records['nodeTime']-self.cascade_records['rootTime']
+        
         self.cascade_records.to_pickle("%s/cascade_records.pkl.gz"%(self.output_dir))
         
     def get_user_diffusion(self):
-        user_diffusion=self.cascade_records.query('actionType=="response"').groupby(['parentUserID','nodeUserID']).size().reset_index(name='num_responses')
-        user_diffusion_=self.cascade_records.query('actionType=="response"').groupby(['parentUserID']).size().reset_index(name='total_num_responses')
+        responses=self.cascade_records.query('actionType=="response"')
+        if responses.shape[0]<1:
+            responses=self.cascade_records.query('actionType=="seed"')
+        ##responses.loc[responses['isNew']==True,'nodeUserID']="new_"
+        user_diffusion=responses.groupby(['parentUserID','nodeUserID']).size().reset_index(name='num_responses')
+        user_diffusion_=responses.groupby(['parentUserID']).size().reset_index(name='total_num_responses')
         
         user_diffusion=pd.merge(user_diffusion,user_diffusion_,on='parentUserID',how='inner')
         user_diffusion['prob']=user_diffusion['num_responses']/user_diffusion['total_num_responses']
         user_diffusion.sort_values(['parentUserID','prob'],ascending=False,inplace=True)
         user_diffusion.to_pickle("%s/user_diffusion.pkl.gz"%(self.output_dir))
+
+        
+#         responses=self.cascade_records.query('actionType=="response"')
+#         responses.loc[responses['isNew']==True,'nodeUserID']="new_"#+cascade_records_chunk['nodeUserID'].str.replace('[a-z]',rand)
+#         user_diffusion0=responses.groupby(['parentUserID','nodeUserID']).size().reset_index(name='num_responses')
+
+#         user_diffusion1=responses.groupby(['parentUserID']).size().reset_index(name='num_children')
+#         user_diffusion1=pd.merge(user_diffusion0,user_diffusion1,on='parentUserID',how='inner')
+#         user_diffusion1['prob_parent']=user_diffusion1['num_responses']/user_diffusion1['num_children']
+
+#         user_diffusion2=responses.groupby(['nodeUserID']).size().reset_index(name='num_parents')
+#         user_diffusion2=pd.merge(user_diffusion0,user_diffusion2,on='nodeUserID',how='inner')
+#         user_diffusion2['prob_child']=user_diffusion2['num_responses']/user_diffusion2['num_parents']
+#         user_diffusion2.drop(columns=['num_responses'],inplace=True)
+
+#         user_diffusion=pd.merge(user_diffusion1,user_diffusion2,on=['parentUserID','nodeUserID'],how='inner')
+#         user_diffusion['prob']=(user_diffusion['prob_parent']+user_diffusion['prob_child'])/2
+#         user_diffusion.sort_values(['parentUserID','prob'],ascending=False,inplace=True)
+        
+#         user_diffusion.to_pickle("%s/user_diffusion.pkl.gz"%(self.output_dir))
+    
         return user_diffusion
+    
+#     def get_decay_user_diffusion(self):
+#         responses=self.cascade_records.query('actionType=="response"')
+#         responses.loc[responses['isNew']==True,'nodeUserID']="new_"
+        
+#         pair_lifetime=responses.groupby(['parentUserID','nodeUserID'])['nodeTime'].min().reset_index(name='lifetime_min')
+        
+#         pair_lifetime=pd.merge(responses,pair_min_lifetime,on=['parentUserID','nodeUserID'],how='inner')
+#         pair_lifetime['lifetime']=(pair_lifetime['nodeTime']-pair_lifetime['lifetime_min']).dt.days
+#         pair_lifetime['lifetime_max']=(start_sim_period_date-pair_lifetime['lifetime_min']).dt.days
+#         pair_lifetime=pair_lifetime[pair_lifetime['lifetime']>0]
+        
+#         pair_lifetime.groupby(['parentUserID','nodeUserID'])['lifetime'].apply(set)
+            
+        
     
     def get_user_spread_info(self):
         self.spread_info1=self.cascade_records.query('actionType=="seed"').groupby(['nodeUserID'])['nodeID'].nunique().reset_index(name="num_seeds")
@@ -106,17 +169,7 @@ class Cascade(object):
         self.spread_info['spread_score']=(self.spread_info['num_responded_seeds']/self.spread_info['num_seeds'])*self.spread_info['num_responses_recvd']
         self.spread_info.sort_values(by='spread_score',ascending=False,inplace=True)
         self.spread_info.set_index('nodeUserID',inplace=True)
-        
-#         cuts=np.arange(50,num_seed_users,50)
-#         for i in cuts:
-#             x=self.spread_info.iloc[:i]['num_responses_recvd'].sum()/self.spread_info['num_responses_recvd'].sum()
-#             #print("%0.2f responses covered by Top-%d influential users."%(x,i))
-#             if x>0.9:
-#                 print("%0.2f responses covered by Top-%d influential users."%(x,i))
-#                 top_k=i
-#                 break;
-#         self.top_k_influentials=list(self.spread_info.iloc[0:top_k].index)
-#         np.save("%s/top_k_influentials.npy"%(self.output_dir),self.top_k_influentials)
+
                 
         self.spread_info.to_pickle("%s/user_spread_info.pkl.gz"%(self.output_dir))
         return self.spread_info
@@ -130,10 +183,10 @@ class Cascade(object):
         
         cascadet=Tree()
 
-        ##print(post_id,author)
+        
         parent=Node(rootID,rootUserID,0,0)
         cascadet.create_node(rootID, rootID, data=parent)
-
+        print(rootID,rootUserID,childNodes)
         for m in childNodes:
             comment_id=m[0]
             parent_post_id=m[1]
@@ -144,17 +197,20 @@ class Cascade(object):
 
             try:
                 parent_node=cascadet.get_node(parent_post_id)
-                ##print("COMMENT: ",comment_id)
+                child_parent_identifier=rootID
+#                 if not parent_node:
+#                     print("Let's create %s"%parent_post_id)
+#                     cascadet.create_node(parent_post_id, parent_post_id, parent=rootID,data=parent_node)
+#                     parent_node=cascadet.get_node(parent_post_id)
+                if parent_node:
+                    child_parent_identifier=parent_node.identifier
 
-                try:
-                    cascadet.create_node(comment_id, comment_id, parent=parent_node.identifier,data=child)
-                except (tree.DuplicatedNodeIdError,AttributeError) as e:
-                    ##print(e)
-                    continue
-            except KeyError as ke:
-                ##print(ke)
-                continue;
+                cascadet.create_node(comment_id, comment_id, parent=child_parent_identifier,data=child)
+            except tree.DuplicatedNodeIdError as e:
+                print("**",e)
+                continue
 
+        print(cascadet)
         return cascadet 
     
     def run_cascade_trees(self):
@@ -170,8 +226,8 @@ class Cascade(object):
         depth=ctree.depth()
         rid=ctree.root
         rnode=ctree.get_node(rid)
-        rnode_data=rnode.data
-        rauthor=rnode_data.get_node_author()
+        #rnode_data=rnode.data
+        #rauthor=rnode_data.get_node_author()
         for node in nodes:
             nid=node.identifier
             nlevel=ctree.level(nid)
@@ -184,23 +240,25 @@ class Cascade(object):
                 ##pchildren=ctree.children(pid)
                 ##p_no_children=len(pchildren)
 
-                pnode=ctree.get_node(pid)
-                pnode_data=pnode.data
-                pauthor=pnode_data.get_node_author()
+                #pnode=ctree.get_node(pid)
+                #pnode_data=pnode.data
+                #pauthor=pnode_data.get_node_author()
             else:
                 pid=-1
-                pauthor=-1
+                #pauthor=-1
                 ##p_no_children=-1
 
 
-            node_data=node.data
+            #node_data=node.data
 
-            nauthor=node_data.get_node_author()
+            #nauthor=node_data.get_node_author()
 
-            nshort_delay=node_data.get_node_short_delay()
-            nlong_delay=node_data.get_node_long_delay()
+            #nshort_delay=node_data.get_node_short_delay()
+            #nlong_delay=node_data.get_node_long_delay()
 
-            llist=[rid,rauthor,depth,nlevel,nid,nauthor,no_children,nshort_delay,nlong_delay,pid,pauthor]
+            #llist=[rid,rauthor,depth,nlevel,nid,nauthor,no_children,nshort_delay,nlong_delay,pid,pauthor]
+            llist=[rid,depth,nlevel,nid,no_children,pid]
+            
             ## only include non-leaves
             ##if(no_children!=0):
             self.cascade_props.append(llist)
@@ -211,17 +269,15 @@ class Cascade(object):
             ##self.get_cascade_props(ctree)
             self.pool.add_task(self.get_cascade_props,ctree)
         self.pool.wait_completion()
-        columns=["rootID","rootUserID","max_depth","level","nodeID","nodeUserID","degree","short_delay","long_delay","parentID","parentUserID"]
+        #columns=["rootID","rootUserID","max_depth","level","nodeID","nodeUserID","degree","short_delay","long_delay","parentID","parentUserID"]
+        columns=["rootID","max_depth","level","nodeID","degree","parentID"]
+      
         self.cascade_props=pd.DataFrame(self.cascade_props,columns=columns)
-        
-#         self.cascade_props['inf_rootID']=False
-#         self.cascade_props.loc[self.cascade_props['rootUserID'].isin(self.top_k_influentials)==True,"inf_rootID"]=True
-        
         self.cascade_props.to_pickle("%s/cascade_props.pkl.gz"%(self.output_dir))
         return self.cascade_props
     
     def get_cascade_branching(self):
-        cascade_props_degree=self.cascade_props.groupby("level")["degree"].apply(list).reset_index(name="degreeV")
+        cascade_props_degree=self.cascade_props.groupby(["level"])["degree"].apply(list).reset_index(name="degreeV")
 
         def _get_prob_vector(row):
             level=row['level']
@@ -244,11 +300,13 @@ class Cascade(object):
             return row
 
         cascade_props_degree=cascade_props_degree.apply(_get_prob_vector,axis=1)
-        cascade_props_degree.set_index('level',inplace=True)
-        cascade_props_degree.to_pickle("%s/cascade_props_prob_degree.pkl.gz"%(self.output_dir))
+        cascade_props_degree.set_index(["level"],inplace=True)
+        cascade_props_degree.to_pickle("%s/cascade_props_prob_level_degree.pkl.gz"%(self.output_dir))
         return cascade_props_degree
     
-#     def get_cascade_inf_branching(self):
+#     def get_cascade_user_branching(self):
+#         cascade_props_degree=self.cascade_props.groupby(["nodeUserID","level"])["degree"].apply(list).reset_index(name="degreeV")
+
 #         def _get_prob_vector(row):
 #             level=row['level']
 #             degree_list=row['degreeV']
@@ -268,29 +326,19 @@ class Cascade(object):
 #             row['probV']=degree_df["probability"].values
 
 #             return row
-        
-#         cascade_props_degree0=self.cascade_props.groupby("level")["degree"].apply(list).reset_index(name="degreeV")
-#         cascade_props_degree0=cascade_props_degree0.apply(_get_prob_vector,axis=1)
-#         cascade_props_degree0.set_index('level',inplace=True)
-#         cascade_props_degree0.to_pickle("%s/cascade_props_prob_degree.pkl.gz"%(self.output_dir))
 
-#         cascade_props_degree1=self.cascade_props.query('inf_rootID==True').groupby("level")["degree"].apply(list).reset_index(name="degreeV")
-#         cascade_props_degree1=cascade_props_degree1.apply(_get_prob_vector,axis=1)
-#         cascade_props_degree1.set_index('level',inplace=True)
-#         cascade_props_degree1.to_pickle("%s/cascade_props_inf_prob_degree.pkl.gz"%(self.output_dir))
-        
-#         cascade_props_degree2=self.cascade_props.query('inf_rootID==False').groupby("level")["degree"].apply(list).reset_index(name="degreeV")
-#         cascade_props_degree2=cascade_props_degree2.apply(_get_prob_vector,axis=1)
-#         cascade_props_degree2.set_index('level',inplace=True)
-#         cascade_props_degree2.to_pickle("%s/cascade_props_non_inf_prob_degree.pkl.gz"%(self.output_dir))
-#         return cascade_props_degree0
+#         cascade_props_degree=cascade_props_degree.apply(_get_prob_vector,axis=1)
+#         cascade_props_degree.set_index(["level"],inplace=True)
+#         cascade_props_degree.to_pickle("%s/cascade_props_prob_user_level_degree.pkl.gz"%(self.output_dir))
+#         return cascade_props_degree
+   
     
-    def get_cascade_delays(self):
-        cascade_props_size=self.cascade_props.groupby("rootID").size().reset_index(name="size")
-        cascade_props_delay=self.cascade_props.groupby("rootID")["long_delay"].apply(list).reset_index(name="delayV")
-        cascade_props_delay=pd.merge(cascade_props_delay,cascade_props_size,on="rootID",how="inner")
-        cascade_props_delay.to_pickle("%s/cascade_props_delay.pkl.gz"%(self.output_dir))
-        return cascade_props_delay
+#     def get_cascade_delays(self):
+#         cascade_props_size=self.cascade_props.groupby("rootID").size().reset_index(name="size")
+#         cascade_props_delay=self.cascade_props.groupby("rootID")["long_delay"].apply(list).reset_index(name="delayV")
+#         cascade_props_delay=pd.merge(cascade_props_delay,cascade_props_size,on="rootID",how="inner")
+#         cascade_props_delay.to_pickle("%s/cascade_props_delay.pkl.gz"%(self.output_dir))
+#         return cascade_props_delay
 
 
 parser = argparse.ArgumentParser(description='Simulation Parameters')
@@ -302,31 +350,68 @@ platform = config_json['PLATFORM']
 domain = config_json['DOMAIN']
 scenario = config_json["SCENARIO"]
 
+start_sim_period=config_json["START_SIM_PERIOD"]
+end_sim_period=config_json["END_SIM_PERIOD"]
+oneD=timedelta(days=1)
+start_sim_period_date=datetime.strptime(start_sim_period,"%Y-%m-%d")
+end_sim_period_date=datetime.strptime(end_sim_period,"%Y-%m-%d")
+num_sim_days=(end_sim_period_date-start_sim_period_date).days+1
+
+training_data_num_days=config_json["TRAINING_DATA_X_MUL_SIM"]
+training_data_num_days=num_sim_days*training_data_num_days
+
+
+train_start_date=start_sim_period_date-(timedelta(days=training_data_num_days))
+###train_start_date=start_sim_period_date-(timedelta(days=training_data_num_days*2))
+print("Train start date: ",train_start_date)
+print("Train end date: ",start_sim_period_date)
+
+num_training_days=(start_sim_period_date-train_start_date).days
+print("# training days: %d"%num_training_days)
+print("# simulation days: %d"%num_sim_days)
+
+
+
 info_ids_path = config_json['INFORMATION_IDS']
-info_ids_path = info_ids_path.format(domain)
+info_ids_path = info_ids_path.format(platform)
 
 ### Load information IDs
 info_ids = pd.read_csv(info_ids_path, header=None)
 info_ids.columns = ['informationID']
 info_ids = sorted(list(info_ids['informationID']))
-info_ids = ['informationID_'+x if 'informationID' not in x else x for x in info_ids]
+#info_ids = ['informationID_'+x if 'informationID' not in x else x for x in info_ids]
 print(len(info_ids),info_ids)
 
 
 input_data_path = config_json["INPUT_CASCADES_FILE_PATH"]
 
+
 try:
-    cascade_records=pd.read_pickle(input_data_path)[["nodeID","parentID","rootID","nodeUserID","nodeTime","informationID"]]
+    cascade_records=pd.read_pickle(input_data_path)[["nodeID","parentID","rootID","nodeUserID","parentUserID","rootUserID","nodeTime","informationID"]]
+    
+#     for col in ['parentID','parentUserID','rootID','rootUserID','nodeID','nodeUserID']:
+#         cascade_records.loc[cascade_records[col].isin(['?','not found','[Deleted]']),col]=None
+        
+    cascade_records['nodeTime']=pd.to_datetime(cascade_records['nodeTime'],infer_datetime_format=True)
+    cascade_records.sort_values(by='nodeTime',inplace=True)
+    cascade_records=cascade_records[cascade_records['nodeTime']<start_sim_period]
+    cascade_records=cascade_records[cascade_records['nodeTime']>=train_start_date.strftime("%Y-%m-%d")]
+    
     print("# Events: %d, # Messages: %d, # Info IDs: %d"%(cascade_records.shape[0],cascade_records['nodeID'].nunique(),cascade_records['informationID'].nunique()))
+    
 except KeyError:
-    print("Reqd fields are missing in the input dataframe, they are nodeID,parentID,rootID,nodeUserID,nodeTime,informationID")
+    print("Reqd fields are missing in the input dataframe, they are nodeID,parentID,rootID,nodeUserID,parentUserID,rootUserID,nodeTime,informationID")
         
 
-for info_id in info_ids:
+def _run(args):
+    info_id=args[0]
+    infoID_label=info_id.replace("/","_")
     print("InformationID: %s"%info_id)
-    info_id_=info_id.replace("informationID_","")
-    cascade_records_info=cascade_records.query('informationID==@info_id_')
-    cascade_records_info=cascade_records_info[["nodeID","parentID","rootID","nodeUserID","nodeTime"]].drop_duplicates()
+
+    cascade_records_info=cascade_records.query('informationID==@info_id')
+    ##cascade_records_info["isNew"]=~cascade_records_info['nodeUserID'].duplicated()
+    ##cascade_records_info=cascade_records_info[cascade_records_info['nodeTime']>=train_start_date_newly.strftime("%Y-%m-%d")]
+
     cas=Cascade(platform,domain,scenario,info_id,cascade_records_info)
     cas.prepare_data()
 
@@ -341,8 +426,14 @@ for info_id in info_ids:
     cascade_props=cas.run_cascade_props()
     print("saved, cascade props")
     cascade_props_degree=cas.get_cascade_branching()
-    print("saved, cascade branching")
-    # cascade_props_degree=cas.get_cascade_inf_branching()
-    # print("saved, cascade inf branching")
-    cascade_props_delay=cas.get_cascade_delays()
-    print("saved, cascade delays")
+    print("saved, cascade level branching")
+#     cascade_props_user_degree=cas.get_cascade_user_branching()
+#     print("saved, cascade user, level branching")
+#     cascade_props_delay=cas.get_cascade_delays()
+#     print("saved, cascade delays")
+    
+for info_id in info_ids:#['arrests']:#['anti']:#
+    _run([info_id])
+    #break;
+    
+#Parallel(n_jobs=len(info_ids))(delayed(_run)([info_id]) for info_id in info_ids)

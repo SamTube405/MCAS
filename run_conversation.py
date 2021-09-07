@@ -23,7 +23,7 @@ from os.path import isfile, join
 import pickle
 
 
-from libs.lib_cascade import *
+from libs.lib_conversation import *
 from joblib import Parallel, delayed
 
 def daterange(start_date, end_date):
@@ -55,64 +55,6 @@ def reset_dir(x_dir):
     del_dir(x_dir)
     create_dir(x_dir)
 
-# def _get_input_posts(path):
-#     input_posts_lines=[]
-#     json_file=open(path,"r")
-#     for line in json_file.readlines():
-#         doc=json.loads(line)
-#         doc = {
-#                 "id_h":doc["nodeID"],
-#                 "author_h":doc["nodeUserID"],
-#                 "created_date":doc["nodeTime"],
-#                 "informationID":doc["informationID"],
-#                 }
-        
-#         input_posts_lines.append(doc)
-        
-#     input_posts_records=json_normalize(input_posts_lines)
-#     input_posts_records.set_index(pd.DatetimeIndex(input_posts_records['created_date']),inplace=True)
-#     return input_posts_records
-
-# def _get_input_messages(path):
-    
-    
-# #     infoIDs=input_messages['informationID'].unique()
-# #     print("Presence: ",infoIDs.shape[0],infoIDs)
-    
-#     input_messages_dict={}
-#     for infoID in info_ids:
-#         infoID_label=infoID.replace("/","_")
-        
-        
-#         ipath=path.format(platform,domain,scenario,infoID_label,model_identifier)
-#         try:
-#             input_messages=pd.read_csv(ipath,header=None)
-#             input_messages.columns=['nodeTime','nodeID','nodeUserID','iDegree','informationID']
-#         except pd.errors.EmptyDataError:
-#             continue
-        
-    
-#         if input_messages.shape[0]>0:
-#             print(infoID,input_messages.shape[0])
-#             input_messages_=input_messages.query('informationID==@infoID')
-#             input_messages_.reset_index(inplace=True)
-#             prevj=0;
-#             nextj=0
-#             input_messages_array=[]
-#             while nextj<input_messages_.shape[0]:
-#                 prevj=nextj
-#                 nextj+=1000
-#                 nextj=min(nextj,input_messages_.shape[0])
-#                 input_messages_array.append(input_messages_.iloc[prevj:nextj])
-
-#             ##input_messages_array=np.array_split(input_messages_, 10)
-#             ##np.split(input_messages_, np.arange(1000,len(a),size))
-#             for i in range(len(input_messages_array)):
-#                 im=input_messages_array[i]
-#                 infoID_im=infoID+"_block_%d"%i
-#                 input_messages_dict.setdefault(infoID_im,im)
-#     ###input_messages=pd.concat(input_messages_array)
-#     return input_messages_dict
 
 def _get_input_messages(sim_data_shares,sim_data_ousers,sim_data_nusers):
         
@@ -132,25 +74,7 @@ def _get_input_messages(sim_data_shares,sim_data_ousers,sim_data_nusers):
             input_messages_dict.setdefault(infoID_step,sim_data_tuple)
     return input_messages_dict
 
-# def _get_global_input_messages(sim_data_shares,sim_data_ousers,sim_data_nusers):
-        
-#     input_messages_dict={}
-#     for infoID in info_ids:
-#         sim_data_shares_infoID=sim_data_shares[infoID]
-#         sim_data_ousers_infoID=sim_data_ousers[infoID]
-#         sim_data_nusers_infoID=sim_data_nusers[infoID]
-        
-#         assert(len(sim_data_shares_infoID)==len(sim_data_ousers_infoID))
-#         assert(len(sim_data_shares_infoID)==len(sim_data_nusers_infoID))
-        
-#         step=1
-#         infoID_step=infoID+"_step_%d"%step
-#         iposts_time=sim_days[step]
-#         sim_data_tuple=(np.sum(sim_data_shares_infoID),np.sum(sim_data_ousers_infoID),np.sum(sim_data_nusers_infoID),iposts_time)
-        
-#         input_messages_dict.setdefault(infoID_step,sim_data_tuple)
 
-#     return input_messages_dict
 
 ### simulation counts loading
 def _load(ktag,model_identifier):
@@ -181,6 +105,7 @@ def _run(args):
     print("[started][job] %s, # seeds: %d, # old users: %d, # new users: %d"%(version,iposts_records[0],iposts_records[1],iposts_records[2],))
     ##iposts_records=iposts_records.to_dict(orient='records')
     
+    
     simX=SimX(platform,domain,scenario,model_identifier,iposts_infoid)
     simX.set_metadata()
     simX.set_user_metadata()
@@ -188,7 +113,7 @@ def _run(args):
     for i in range(1,sim_num_trials+1):
         simX._run_simulate(iposts_records,"V%d-%s"%(i,version))
         print("[completed][job] %s"%version)
-        
+
 def _run_model(model_identifier):
     print("\n\n%s\n\n"%model_identifier)
     ### reset simulation output dirs.
@@ -218,9 +143,6 @@ def _run_model(model_identifier):
     Parallel(n_jobs=block_count)(delayed(_run)([k,v]) for k,v in input_messages_dict.items())
     # for k,v in input_messages_dict.items():
     #     _run([k,v])
-    
-    
-
 
 start = time.time()
 """
@@ -277,11 +199,10 @@ print("DARPA SOCIALSIM SIMULATION")
 print("------------ platform: %s. domain: %s. scenario: %s. version: %s"%(platform,domain,scenario,version_tag))
 
 
+
 for model_identifier in model_identifiers:
     _run_model(model_identifier)
-
-
-
+    
 
 end = time.time()
 elapsed=float(end - start)/60
