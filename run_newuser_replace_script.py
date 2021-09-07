@@ -71,7 +71,7 @@ sim_file_name = "{0}_v1.pkl.gz".format(model_id.lower())
 final_sim_file_name = sim_file_name
 
 ### Path to informationIDs
-narratives_path = "./newuser_module/cp6_infoids_{0}.txt".format(platform)
+narratives_path = "./metadata/configs/infoids_{0}.txt".format(platform)
 
 ### Path to load cascade output file
 sim_file_path = "./newuser_module/Simulation_cascade_output/{0}/{1}/{2}/{3}".format(sim_file_domain, platform, model_id, sim_file_name)
