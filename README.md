@@ -69,6 +69,12 @@ ml_output
 5. Run new user scripts (Modify parameters within the code correspondingly)
     1. python run_newuser_replace_script.py
 
+
+## Related Publications
+1. Horawalavithana, Sameera, et al. "Online discussion threads as conversation pools: predicting the growth of discussion threads on reddit." Computational and Mathematical Organization Theory (2021): 1-29. https://www.cse.usf.edu/dsg/data/publications/papers/Data-driven-Studies-on-Social-Networks-Privacy-and-Simulation.pdf
+2. NG, Kin, et al. "Social-Media Activity Forecasting with Exogenous Information Signals", Advances in Social Network Analysis and Mining (ASONAM 2021) https://arxiv.org/pdf/2109.11024
+3. Horawalavithana, Sameera. "Data-driven Studies on Social Networks: Privacy and Simulation" Chap. 5. Ph.D. Dissertation, University of South Florida, 2021 https://www.cse.usf.edu/dsg/data/publications/papers/Data-driven-Studies-on-Social-Networks-Privacy-and-Simulation.pdf
+
 ## Acknowledgments
 This work is supported by the DARPA SocialSim Program and the Air Force Research Laboratory under contract FA8650-18-C-7825.
  
